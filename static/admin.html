@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>License Admin Panel</title>
+</head>
+<body>
+    <h2>Create New License</h2>
+    <form id="licenseForm">
+        Max Devices: <input type="number" name="max_devices" value="1"><br>
+        Days: <input type="number" name="days" value="365"><br>
+        Active: <input type="checkbox" name="active" checked><br>
+        Admin Token: <input type="text" id="adminToken" name="token"><br>
+        <button type="submit">Create License</button>
+    </form>
+    <p id="result"></p>
+
+    <h2>Existing Licenses</h2>
+    <div id="licenses"></div>
+
+    <script>
+        const form = document.getElementById("licenseForm");
+
+        async function fetchLicenses() {
+            const token = document.getElementById('adminToken').value || '';
+            const res = await fetch('/admin/licenses?token=' + encodeURIComponent(token));
+            if (!res.ok) {
+                document.getElementById('licenses').textContent = 'Failed to load licenses: ' + res.status;
+                return;
+            }
+            const list = await res.json();
+            const container = document.getElementById('licenses');
+            container.innerHTML = '';
+            if (!Array.isArray(list) || list.length === 0) {
+                container.textContent = 'No licenses yet.';
+                return;
+            }
+            const table = document.createElement('table');
+            table.border = 1;
+            const header = document.createElement('tr');
+            ['Key','Max Devices','Active','Expires At','Actions'].forEach(h => {
+                const th = document.createElement('th'); th.textContent = h; header.appendChild(th);
+            });
+            table.appendChild(header);
+            list.forEach(l => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${l.license_key}</td><td>${l.max_devices}</td><td>${l.active}</td><td>${l.expires_at || ''}</td>`;
+                const actionsTd = document.createElement('td');
+
+                const revokeBtn = document.createElement('button');
+                revokeBtn.textContent = 'Revoke';
+                revokeBtn.addEventListener('click', async () => { await callAction('revoke', l.license_key); });
+
+                const reactivateBtn = document.createElement('button');
+                reactivateBtn.textContent = 'Reactivate';
+                reactivateBtn.addEventListener('click', async () => { await callAction('reactivate', l.license_key); });
+
+                const delBtn = document.createElement('button');
+                delBtn.textContent = 'Delete';
+                delBtn.addEventListener('click', async () => { if(confirm('Delete license '+l.license_key+'?')) await callAction('delete', l.license_key); });
+
+                actionsTd.appendChild(revokeBtn);
+                actionsTd.appendChild(reactivateBtn);
+                actionsTd.appendChild(delBtn);
+                tr.appendChild(actionsTd);
+                table.appendChild(tr);
+            });
+            container.appendChild(table);
+        }
+
+        async function callAction(action, key) {
+            const token = document.getElementById('adminToken').value || '';
+            let url = '/admin/licenses/' + encodeURIComponent(key) + '/' + action + '?token=' + encodeURIComponent(token);
+            let opts = { method: 'POST' };
+            if (action === 'delete') { url = '/admin/licenses/' + encodeURIComponent(key) + '?token=' + encodeURIComponent(token); opts = { method: 'DELETE' }; }
+            const res = await fetch(url, opts);
+            if (!res.ok) {
+                alert('Action failed: ' + res.status);
+                return;
+            }
+            await fetchLicenses();
+        }
+
+        form.addEventListener("submit", async e => {
+            e.preventDefault();
+            const token = document.getElementById('adminToken').value || '';
+            const data = Object.fromEntries(new FormData(form).entries());
+            data.active = data.active === "on";
+            const res = await fetch("/admin/licenses?token=" + encodeURIComponent(token), {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ max_devices: Number(data.max_devices), days: Number(data.days), active: data.active })
+            });
+            const json = await res.json();
+            document.getElementById("result").textContent = JSON.stringify(json);
+            await fetchLicenses();
+        });
+
+        // refresh list when token input loses focus or Enter pressed
+        document.getElementById('adminToken').addEventListener('change', fetchLicenses);
+        document.getElementById('adminToken').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); fetchLicenses(); } });
+
+        // initial load
+        fetchLicenses();
+    </script>
+</body>
+</html>

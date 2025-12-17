@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from database import Base
 
 class License(Base):
@@ -8,6 +8,8 @@ class License(Base):
     license_key = Column(String, unique=True, index=True)
     max_devices = Column(Integer, default=1)
     active = Column(Boolean, default=True)
+    expires_at = Column(DateTime, nullable=True)
+
 
 class Device(Base):
     __tablename__ = "devices"
