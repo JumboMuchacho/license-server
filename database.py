@@ -22,6 +22,10 @@ def apply_pending_migrations():
 		if 'expires_at' not in cols:
 			cur.execute("ALTER TABLE licenses ADD COLUMN expires_at DATETIME")
 			conn.commit()
+		# add assigned_users column if missing (stores JSON text)
+		if 'assigned_users' not in cols:
+			cur.execute("ALTER TABLE licenses ADD COLUMN assigned_users TEXT")
+			conn.commit()
 	finally:
 		try:
 			cur.close()

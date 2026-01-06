@@ -9,6 +9,8 @@ class License(Base):
     max_devices = Column(Integer, default=1)
     active = Column(Boolean, default=True)
     expires_at = Column(DateTime, nullable=True)
+    # JSON-serialized list of assigned user names for this license
+    assigned_users = Column(String, nullable=True)
 
 
 class Device(Base):

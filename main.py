@@ -40,40 +40,64 @@ def admin_ui():
 @app.post("/verify")
 def verify(req: VerifyRequest):
     db = SessionLocal()
+    try:
+        # First check if license exists at all (without active filter)
+        license = db.query(models.License).filter_by(
+            license_key=req.license_key.strip()
+        ).first()
 
-    license = db.query(models.License).filter_by(
-        license_key=req.license_key,
-        active=True
-    ).first()
+        if not license:
+            db.close()
+            raise HTTPException(status_code=403, detail="License key not found")
 
-    if not license:
-        raise HTTPException(status_code=403, detail="Invalid license")
+        # Check if license is active
+        if not license.active:
+            db.close()
+            raise HTTPException(status_code=403, detail="License is inactive (revoked)")
 
-    # accept either field for compatibility with existing clients
-    device_identifier = req.device_id or req.machine_id
-    if not device_identifier:
-        raise HTTPException(status_code=400, detail="Missing device identifier")
+        # check expiry if set
+        if getattr(license, 'expires_at', None) is not None:
+            import datetime as _dt
+            if license.expires_at <= _dt.datetime.utcnow():
+                db.close()
+                raise HTTPException(status_code=403, detail="License expired")
 
-    device = db.query(models.Device).filter_by(
-        license_id=license.id,
-        device_id=device_identifier
-    ).first()
+        # accept either field for compatibility with existing clients
+        device_identifier = req.device_id or req.machine_id
+        if not device_identifier:
+            db.close()
+            raise HTTPException(status_code=400, detail="Missing device identifier")
 
-    if device:
+        device = db.query(models.Device).filter_by(
+            license_id=license.id,
+            device_id=device_identifier
+        ).first()
+
+        if device:
+            db.close()
+            return {"status": "ok"}
+
+        devices_count = db.query(models.Device).filter_by(
+            license_id=license.id
+        ).count()
+
+        if devices_count >= license.max_devices:
+            db.close()
+            raise HTTPException(status_code=403, detail="Device limit reached")
+
+        new_device = models.Device(
+            license_id=license.id,
+            device_id=device_identifier
+        )
+        db.add(new_device)
+        db.commit()
+        db.close()
+
         return {"status": "ok"}
-
-    devices_count = db.query(models.Device).filter_by(
-        license_id=license.id
-    ).count()
-
-    if devices_count >= license.max_devices:
-        raise HTTPException(status_code=403, detail="Device limit reached")
-
-    new_device = models.Device(
-        license_id=license.id,
-        device_id=device_identifier
-    )
-    db.add(new_device)
-    db.commit()
-
-    return {"status": "ok"}
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        db.close()
+        raise
+    except Exception as e:
+        db.close()
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
