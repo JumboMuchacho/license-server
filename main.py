@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import datetime
 
-from database import SessionLocal, engine, apply_pending_migrations
+from database import SessionLocal, engine
 import models
 from admin_routes import router as admin_router
 
@@ -16,13 +16,11 @@ app = FastAPI(title="License Server")
 # DB setup (run once)
 # -------------------------
 models.Base.metadata.create_all(bind=engine)
-apply_pending_migrations()
 
 # -------------------------
 # Routers
 # -------------------------
 app.include_router(admin_router)
-
 
 # -------------------------
 # Schemas
@@ -31,14 +29,12 @@ class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
 
-
 # -------------------------
 # Health check (optional but recommended)
 # -------------------------
 @app.get("/")
 def root():
     return {"status": "License server running"}
-
 
 # -------------------------
 # License verification
