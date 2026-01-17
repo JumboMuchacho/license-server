@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import datetime
 
-from database import SessionLocal, engine
+from database import SessionLocal, engine, apply_pending_migrations
 import models
 from admin_routes import router as admin_router
 
@@ -12,10 +12,12 @@ from admin_routes import router as admin_router
 # -------------------------
 app = FastAPI(title="License Server")
 
-# -------------------------
-# DB setup (run once)
-# -------------------------
-models.Base.metadata.create_all(bind=engine)
+@app.on_event("startup")
+def on_startup():
+    print("Running DB setup...")
+    models.Base.metadata.create_all(bind=engine)
+    apply_pending_migrations()
+    print("DB ready.")
 
 # -------------------------
 # Routers
@@ -35,6 +37,11 @@ class VerifyRequest(BaseModel):
 @app.get("/")
 def root():
     return {"status": "License server running"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 # -------------------------
 # License verification
