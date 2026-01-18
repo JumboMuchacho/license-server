@@ -1,3 +1,4 @@
+![Security Scan](https://github.com/JumboMuchacho/license-server/actions/workflows/security.yml/badge.svg)
 # License-server
 A production-ready Python licensing and device management system built with **FastAPI** and **SQLAlchemy**. This server enables software monetization by managing license keys, enforcing device limits (Hardware-ID locking), and providing a streamlined integration client.  
 
