@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import datetime
 
+# Ensure database.py uses os.getenv("DATABASE_URL")
 from database import SessionLocal, engine, apply_pending_migrations
 import models
 from admin_routes import router as admin_router
@@ -15,6 +16,7 @@ app = FastAPI(title="License Server")
 @app.on_event("startup")
 def on_startup():
     print("Running DB setup...")
+    # This creates tables if they don't exist
     models.Base.metadata.create_all(bind=engine)
     apply_pending_migrations()
     print("DB ready.")
@@ -32,12 +34,11 @@ class VerifyRequest(BaseModel):
     device_id: str
 
 # -------------------------
-# Health check (optional but recommended)
+# Health check
 # -------------------------
 @app.get("/")
 def root():
     return {"status": "License server running"}
-
 
 @app.get("/health")
 def health():
@@ -58,7 +59,9 @@ def verify(req: VerifyRequest):
         if not lic:
             raise HTTPException(status_code=404, detail="License not found or inactive")
 
-        if lic.expires_at and lic.expires_at < datetime.datetime.utcnow():
+        # Updated for Python 3.13 compatibility
+        now = datetime.datetime.now(datetime.UTC).replace(tzinfo=None)
+        if lic.expires_at and lic.expires_at < now:
             raise HTTPException(status_code=410, detail="License expired")
 
         # Check if device already registered
@@ -87,5 +90,8 @@ def verify(req: VerifyRequest):
 
         return {"status": "ok", "message": "Device registered and verified"}
 
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()
