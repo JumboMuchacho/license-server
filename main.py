@@ -3,58 +3,35 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import datetime
 import logging
+import time
 
 from database import SessionLocal, engine
 import models
-from admin_routes import router as admin_router
+from security import sign_payload
 
-# -------------------------
-# Logging
-# -------------------------
 logging.basicConfig(level=logging.INFO)
 
-# -------------------------
-# App initialization
-# -------------------------
+CLIENT_VERSION = "1.0.0"
+OFFLINE_TTL_HOURS = 48
+
 app = FastAPI(title="License Server")
 
-@app.on_event("startup")
-def on_startup():
-    logging.info("Starting License Server...")
 
-    # 🚑 Do NOT crash app if DB is temporarily unavailable
+@app.on_event("startup")
+def startup():
     try:
         models.Base.metadata.create_all(bind=engine)
-        logging.info("DB ready.")
+        logging.info("DB ready")
     except Exception as e:
-        logging.error(f"DB unavailable at startup: {e}")
+        logging.error(f"DB unavailable: {e}")
 
-# -------------------------
-# Routers
-# -------------------------
-app.include_router(admin_router)
 
-# -------------------------
-# Schemas
-# -------------------------
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
+    client_version: str
 
-# -------------------------
-# Health checks
-# -------------------------
-@app.get("/")
-def root():
-    return {"status": "License server running"}
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-# -------------------------
-# License verification
-# -------------------------
 @app.post("/verify")
 def verify(req: VerifyRequest):
     db: Session = SessionLocal()
@@ -65,44 +42,45 @@ def verify(req: VerifyRequest):
         ).first()
 
         if not lic:
-            raise HTTPException(status_code=404, detail="License not found or inactive")
+            raise HTTPException(404, "License invalid")
 
-        # Use UTC for consistency across servers
-        now = datetime.datetime.utcnow()
-        if lic.expires_at and lic.expires_at < now:
-            raise HTTPException(status_code=410, detail="License expired")
+        if req.client_version < lic.min_client_version:
+            raise HTTPException(426, "Client update required")
 
-        # Check if device already registered
-        existing = db.query(models.Device).filter_by(
+        if lic.expires_at and lic.expires_at < datetime.datetime.utcnow():
+            raise HTTPException(410, "License expired")
+
+        device = db.query(models.Device).filter_by(
             license_id=lic.id,
             device_id=req.device_id
         ).first()
 
-        if existing:
-            return {"status": "ok", "message": "Device verified"}
+        if not device:
+            count = db.query(models.Device).filter_by(
+                license_id=lic.id
+            ).count()
+            if count >= lic.max_devices:
+                raise HTTPException(429, "Device limit reached")
 
-        # Enforce device limit
-        device_count = db.query(models.Device).filter_by(
-            license_id=lic.id
-        ).count()
+            db.add(models.Device(
+                license_id=lic.id,
+                device_id=req.device_id
+            ))
+            db.commit()
 
-        if device_count >= lic.max_devices:
-            raise HTTPException(status_code=429, detail="Device limit reached")
+        expires = int(time.time()) + OFFLINE_TTL_HOURS * 3600
 
-        # Register new device
-        db.add(models.Device(
-            license_id=lic.id,
-            device_id=req.device_id
-        ))
-        db.commit()
+        token = {
+            "license": req.license_key,
+            "device": req.device_id,
+            "exp": expires,
+            "v": req.client_version,
+        }
 
-        return {"status": "ok", "message": "Device registered and verified"}
+        return {
+            "token": token,
+            "signature": sign_payload(token),
+        }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logging.error(f"Verification error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         db.close()

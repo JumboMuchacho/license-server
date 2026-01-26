@@ -41,6 +41,20 @@ curl -X POST "[http://127.0.0.1:8000/verify](http://127.0.0.1:8000/verify)" \
      -d '{"license_key":"YOUR_KEY", "machine_id":"DEVICE_01"}'
 ```
 ## 📡 API Reference
+### Architecture
+Server
+ ├─ /verify
+ │   ├─ validates license
+ │   ├─ enforces min_client_version
+ │   ├─ enforces device limits
+ │   └─ returns signed offline token
+ │
+Client
+ ├─ verifies server response
+ ├─ validates HMAC token
+ ├─ allows offline only until expiry
+ └─ forces recheck after TTL
+
 ### Admin API Endpoints
 
 | Endpoint | Method | Action |
