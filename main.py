@@ -50,6 +50,13 @@ def health():
     return {"status": "ok"}
 
 # ----------------------------
+# Optional friendly root endpoint
+# ----------------------------
+@app.get("/")
+def index():
+    return {"message": "License Server is running. Use /verify to validate licenses."}
+
+# ----------------------------
 # License verification endpoint
 # ----------------------------
 class VerifyRequest(BaseModel):
