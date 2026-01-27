@@ -2,21 +2,45 @@ import hmac
 import hashlib
 import json
 import os
+from typing import Dict
 
-SECRET = os.getenv("LICENSE_SECRET", "CHANGE_ME_NOW").encode()
+
+# MUST be set in Render / Railway / env vars
+# Example: LICENSE_SECRET = "super-long-random-string"
+SECRET = os.getenv("LICENSE_SECRET")
+
+if not SECRET:
+    raise RuntimeError("LICENSE_SECRET environment variable is not set")
+
+SECRET = SECRET.encode()
 
 
-def sign_payload(payload: dict) -> str:
+def _canonical_json(payload: Dict) -> str:
     """
-    Create an HMAC-SHA256 signature for a JSON payload
+    Produce deterministic JSON string for signing.
+    Order + separators MUST NEVER change.
     """
-    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    return hmac.new(SECRET, raw.encode(), hashlib.sha256).hexdigest()
+    return json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
 
 
-def verify_signature(payload: dict, signature: str) -> bool:
+def sign_payload(payload: Dict) -> str:
     """
-    Verify payload integrity
+    Create an HMAC-SHA256 signature for a payload.
+    Used by the license server ONLY.
+    """
+    raw = _canonical_json(payload).encode()
+    return hmac.new(SECRET, raw, hashlib.sha256).hexdigest()
+
+
+def verify_signature(payload: Dict, signature: str) -> bool:
+    """
+    Verify payload integrity and authenticity.
+    Used by the CLIENT.
     """
     expected = sign_payload(payload)
     return hmac.compare_digest(expected, signature)
