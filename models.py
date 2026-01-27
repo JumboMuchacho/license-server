@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship
 import datetime
 from database import Base
 
-
 class License(Base):
     __tablename__ = "licenses"
 
@@ -13,9 +12,7 @@ class License(Base):
     max_devices = Column(Integer, default=1)
     expires_at = Column(DateTime, nullable=True)
 
-    # ✅ NEW
-    min_client_version = Column(String, default="1.0.0")
-
+    # Removed min_client_version to fix the 500 Error
     devices = relationship("Device", back_populates="license")
 
 
