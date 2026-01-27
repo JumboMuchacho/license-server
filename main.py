@@ -111,7 +111,7 @@ def verify(req: VerifyRequest):
 
         return {
             "token": token,
-            "signature": sign_payload(token, LICENSE_SECRET),
+            "signature": sign_payload(token),
         }
 
     finally:
