@@ -23,7 +23,6 @@ if not LICENSE_SECRET:
 
 logging.basicConfig(level=logging.INFO)
 
-CLIENT_VERSION = "1.0.0"
 OFFLINE_TTL_HOURS = 48
 
 # ----------------------------
@@ -62,22 +61,24 @@ def index():
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
-    client_version: str
+    client_version: str  # Added to match client and fix 422 error
 
 @app.post("/verify")
 def verify(req: VerifyRequest):
     db: Session = SessionLocal()
     try:
+        print(f"DEBUG: Received request - license_key={req.license_key}, device_id={req.device_id}, client_version={req.client_version}")  # Debug log
         lic = db.query(models.License).filter_by(
             license_key=req.license_key,
             active=True
         ).first()
 
         if not lic:
+            print("DEBUG: License not found in DB")  # Debug log
             raise HTTPException(404, "License invalid")
 
-
         if lic.expires_at and lic.expires_at < datetime.datetime.utcnow():
+            print("DEBUG: License expired")  # Debug log
             raise HTTPException(410, "License expired")
 
         device = db.query(models.Device).filter_by(
@@ -90,6 +91,7 @@ def verify(req: VerifyRequest):
                 license_id=lic.id
             ).count()
             if count >= lic.max_devices:
+                print("DEBUG: Device limit reached")  # Debug log
                 raise HTTPException(429, "Device limit reached")
 
             db.add(models.Device(
@@ -105,7 +107,6 @@ def verify(req: VerifyRequest):
             "license": req.license_key,
             "device": req.device_id,
             "exp": expires,
-            "v": req.client_version,
         }
 
         return {
