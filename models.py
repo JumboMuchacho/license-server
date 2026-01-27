@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-import datetime
 from database import Base
 
 class License(Base):
@@ -11,10 +10,10 @@ class License(Base):
     active = Column(Boolean, default=True)
     max_devices = Column(Integer, default=1)
     expires_at = Column(DateTime, nullable=True)
+    # Match the new column seen in your database screenshot
+    assigned_users = Column(String, nullable=True) 
 
-    # Removed min_client_version to fix the 500 Error
     devices = relationship("Device", back_populates="license")
-
 
 class Device(Base):
     __tablename__ = "devices"
