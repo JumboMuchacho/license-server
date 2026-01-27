@@ -1,23 +1,21 @@
+import os
+import time
+import datetime
+import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-import datetime
-import logging
-import time
-import os
-from dotenv import load_dotenv  # <-- added
+from dotenv import load_dotenv
 
 from database import SessionLocal, engine
 import models
 from security import sign_payload
 
 # ----------------------------
-# Load LICENSE_SECRET from .env or environment
+# Load environment variables
 # ----------------------------
-load_dotenv()  # loads .env if present
-
+load_dotenv()
 LICENSE_SECRET = os.getenv('LICENSE_SECRET')
-
 if not LICENSE_SECRET:
     raise ValueError(
         "LICENSE_SECRET not set! Add it to .env or your environment variables."
@@ -28,23 +26,36 @@ logging.basicConfig(level=logging.INFO)
 CLIENT_VERSION = "1.0.0"
 OFFLINE_TTL_HOURS = 48
 
+# ----------------------------
+# FastAPI app
+# ----------------------------
 app = FastAPI(title="License Server")
 
-
+# ----------------------------
+# Startup: initialize DB
+# ----------------------------
 @app.on_event("startup")
 def startup():
     try:
         models.Base.metadata.create_all(bind=engine)
-        logging.info("DB ready")
+        logging.info("Database ready")
     except Exception as e:
         logging.error(f"DB unavailable: {e}")
 
+# ----------------------------
+# Health check endpoint (Render requirement)
+# ----------------------------
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
+# ----------------------------
+# License verification endpoint
+# ----------------------------
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
     client_version: str
-
 
 @app.post("/verify")
 def verify(req: VerifyRequest):
@@ -82,6 +93,7 @@ def verify(req: VerifyRequest):
             ))
             db.commit()
 
+        # Token expires in OFFLINE_TTL_HOURS hours
         expires = int(time.time()) + OFFLINE_TTL_HOURS * 3600
 
         token = {
@@ -91,7 +103,6 @@ def verify(req: VerifyRequest):
             "v": req.client_version,
         }
 
-        # Pass LICENSE_SECRET to sign_payload
         return {
             "token": token,
             "signature": sign_payload(token, LICENSE_SECRET),
@@ -99,3 +110,11 @@ def verify(req: VerifyRequest):
 
     finally:
         db.close()
+
+# ----------------------------
+# Run the app using Uvicorn
+# ----------------------------
+if __name__ == "__main__":
+    import uvicorn
+    PORT = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
