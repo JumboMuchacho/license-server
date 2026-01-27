@@ -76,8 +76,6 @@ def verify(req: VerifyRequest):
         if not lic:
             raise HTTPException(404, "License invalid")
 
-        if req.client_version < lic.min_client_version:
-            raise HTTPException(426, "Client update required")
 
         if lic.expires_at and lic.expires_at < datetime.datetime.utcnow():
             raise HTTPException(410, "License expired")
