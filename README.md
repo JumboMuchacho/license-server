@@ -45,7 +45,6 @@ curl -X POST "[http://127.0.0.1:8000/verify](http://127.0.0.1:8000/verify)" \
 Server
  ├─ /verify
  │   ├─ validates license
- │   ├─ enforces min_client_version
  │   ├─ enforces device limits
  │   └─ returns signed offline token
  │
