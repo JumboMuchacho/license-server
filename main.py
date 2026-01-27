@@ -4,10 +4,24 @@ from sqlalchemy.orm import Session
 import datetime
 import logging
 import time
+import os
+from dotenv import load_dotenv  # <-- added
 
 from database import SessionLocal, engine
 import models
 from security import sign_payload
+
+# ----------------------------
+# Load LICENSE_SECRET from .env or environment
+# ----------------------------
+load_dotenv()  # loads .env if present
+
+LICENSE_SECRET = os.getenv('LICENSE_SECRET')
+
+if not LICENSE_SECRET:
+    raise ValueError(
+        "LICENSE_SECRET not set! Add it to .env or your environment variables."
+    )
 
 logging.basicConfig(level=logging.INFO)
 
@@ -77,9 +91,10 @@ def verify(req: VerifyRequest):
             "v": req.client_version,
         }
 
+        # Pass LICENSE_SECRET to sign_payload
         return {
             "token": token,
-            "signature": sign_payload(token),
+            "signature": sign_payload(token, LICENSE_SECRET),
         }
 
     finally:
