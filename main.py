@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
@@ -12,25 +13,41 @@ from dotenv import load_dotenv
 from database import SessionLocal, engine
 import models
 from security import sign_payload
+from admin_routes import router as admin_router
+from auth import oauth_router
 
 # ----------------------------
 # Load environment variables
 # ----------------------------
 load_dotenv()
+
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
 if not LICENSE_SECRET:
-    raise ValueError(
-        "LICENSE_SECRET not set! Add it to .env or your environment variables."
-    )
+    raise ValueError("LICENSE_SECRET not set")
+
+OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
 
 logging.basicConfig(level=logging.INFO)
-
-OFFLINE_TTL_HOURS = 48
 
 # ----------------------------
 # FastAPI app
 # ----------------------------
 app = FastAPI(title="License Server")
+
+# ----------------------------
+# Static Admin UI
+# ----------------------------
+app.mount(
+    "/admin-ui",
+    StaticFiles(directory="static/admin", html=True),
+    name="admin-ui",
+)
+
+# ----------------------------
+# Routers
+# ----------------------------
+app.include_router(admin_router)   # /admin/*
+app.include_router(oauth_router)   # /admin/oauth/callback
 
 # ----------------------------
 # Startup: initialize DB
@@ -41,41 +58,35 @@ def startup():
         models.Base.metadata.create_all(bind=engine)
         logging.info("Database ready")
     except Exception as e:
-        logging.error(f"DB unavailable: {e}")
+        logging.error(f"DB error: {e}")
 
 # ----------------------------
-# Health check endpoint
+# Health
 # ----------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 # ----------------------------
-# Root endpoint
+# Root
 # ----------------------------
 @app.get("/")
 def index():
-    return {
-        "message": "License Server is running. Use /verify to validate licenses."
-    }
+    return {"message": "License Server running"}
 
 # ----------------------------
-# License verification endpoint
+# License verification
 # ----------------------------
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
-    client_version: Optional[str] = None  # ✅ OPTIONAL now
+    client_version: Optional[str] = None
+
 
 @app.post("/verify")
 def verify(req: VerifyRequest):
     db: Session = SessionLocal()
     try:
-        logging.info(
-            f"Verify request: license={req.license_key}, "
-            f"device={req.device_id}, version={req.client_version}"
-        )
-
         lic = (
             db.query(models.License)
             .filter_by(license_key=req.license_key, active=True)
@@ -83,10 +94,10 @@ def verify(req: VerifyRequest):
         )
 
         if not lic:
-            raise HTTPException(status_code=404, detail="License invalid")
+            raise HTTPException(404, "License invalid")
 
         if lic.expires_at and lic.expires_at < datetime.datetime.utcnow():
-            raise HTTPException(status_code=410, detail="License expired")
+            raise HTTPException(410, "License expired")
 
         device = (
             db.query(models.Device)
@@ -95,28 +106,14 @@ def verify(req: VerifyRequest):
         )
 
         if not device:
-            count = (
-                db.query(models.Device)
-                .filter_by(license_id=lic.id)
-                .count()
-            )
-
+            count = db.query(models.Device).filter_by(license_id=lic.id).count()
             if count >= lic.max_devices:
-                raise HTTPException(
-                    status_code=429, detail="Device limit reached"
-                )
+                raise HTTPException(429, "Device limit reached")
 
-            db.add(
-                models.Device(
-                    license_id=lic.id,
-                    device_id=req.device_id
-                )
-            )
+            db.add(models.Device(license_id=lic.id, device_id=req.device_id))
             db.commit()
 
-        # Offline token expiry
         expires = int(time.time()) + OFFLINE_TTL_HOURS * 3600
-
         token = {
             "license": req.license_key,
             "device": req.device_id,
@@ -132,10 +129,13 @@ def verify(req: VerifyRequest):
         db.close()
 
 # ----------------------------
-# Run with Uvicorn
+# Local run
 # ----------------------------
 if __name__ == "__main__":
     import uvicorn
 
-    PORT = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(
+        app,
+        host=os.getenv("HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", 10000)),
+    )

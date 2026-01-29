@@ -1,28 +1,76 @@
+import json
 import hmac
 import hashlib
-import json
-import os
-from dotenv import load_dotenv
 
-# Ensure .env variables are loaded into the environment
-load_dotenv()
+# -------------------------------------------------
+# Cryptographic parameters
+# -------------------------------------------------
 
-# Look for the secret in environment variables
-SECRET = os.getenv("LICENSE_SECRET")
+# IMPORTANT:
+# This salt MUST match the client exactly.
+# It is NOT a secret — it is a derivation constant.
+SALT = b"popup_detector_v2_secure_salt_2024"
 
-# Safeguard: Crash immediately if the secret isn't found
-if not SECRET:
-    raise ValueError("CRITICAL ERROR: LICENSE_SECRET not found in environment variables!")
+PBKDF2_ITERATIONS = 100_000
+KEY_LENGTH = 32  # 256-bit HMAC key
+
+
+# -------------------------------------------------
+# Secret derivation (device-bound)
+# -------------------------------------------------
+
+def derive_device_secret(device_id: str) -> bytes:
+    """
+    Derive a per-device HMAC secret using PBKDF2.
+    This replaces the old LICENSE_SECRET model.
+    """
+    return hashlib.pbkdf2_hmac(
+        hash_name="sha256",
+        password=device_id.encode("utf-8"),
+        salt=SALT,
+        iterations=PBKDF2_ITERATIONS,
+        dklen=KEY_LENGTH,
+    )
+
+
+# -------------------------------------------------
+# Payload signing
+# -------------------------------------------------
 
 def sign_payload(payload: dict) -> str:
-    """Creates a cryptographic signature of the payload."""
-    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    """
+    Create a cryptographic signature for a payload.
+
+    The payload MUST contain a 'device' field.
+    """
+    if "device" not in payload:
+        raise ValueError("Payload missing required 'device' field")
+
+    # Canonical JSON encoding (must match client exactly)
+    raw = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    secret = derive_device_secret(payload["device"])
+
     return hmac.new(
-        SECRET.encode(),
-        raw.encode(),
+        secret,
+        raw,
         hashlib.sha256
     ).hexdigest()
 
+
+# -------------------------------------------------
+# Signature verification (server-side optional use)
+# -------------------------------------------------
+
 def verify_signature(payload: dict, signature: str) -> bool:
-    """Verifies that the signature matches the payload and the secret key."""
-    return hmac.compare_digest(sign_payload(payload), signature)
+    """
+    Verify that a payload was signed correctly.
+    Mostly useful for internal checks or future endpoints.
+    """
+    expected = sign_payload(payload)
+    return hmac.compare_digest(expected, signature)

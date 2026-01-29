@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>License Server – Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      padding: 20px;
+    }
+    button {
+      padding: 8px 14px;
+      margin: 4px;
+      cursor: pointer;
+    }
+    input {
+      padding: 6px;
+      margin: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    th, td {
+      border-bottom: 1px solid #334155;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background: #020617;
+    }
+    .danger { color: #f87171; }
+    .success { color: #4ade80; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>🔐 License Server – Admin</h1>
+
+<div id="auth">
+  <button onclick="login()">Sign in with Google</button>
+</div>
+
+<div id="panel" class="hidden">
+  <p>
+    Logged in as <b id="email"></b>
+    <button onclick="logout()">Logout</button>
+  </p>
+
+  <h2>Create License</h2>
+  <input id="days" type="number" placeholder="Days" value="30" />
+  <input id="max_devices" type="number" placeholder="Max devices" value="1" />
+  <button onclick="createLicense()">Create</button>
+
+  <h2>Licenses</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Active</th>
+        <th>Devices</th>
+        <th>Expires</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="licenses"></tbody>
+  </table>
+</div>
+
+<script>
+  // 🔧 CONFIG — FILL THESE
+  const SUPABASE_URL = "https://efhcunpogynphopqcqze.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
+  const API_BASE = "";
+
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function login() {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin + "/admin/oauth/callback"
+      }
+    });
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    location.reload();
+  }
+
+  async function getSession() {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+  }
+
+  async function api(path, options = {}) {
+    const session = await getSession();
+    if (!session) throw new Error("Not authenticated");
+
+    return fetch(API_BASE + path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`
+      }
+    });
+  }
+
+  async function loadLicenses() {
+    const res = await api("/admin/licenses");
+    const data = await res.json();
+
+    const tbody = document.getElementById("licenses");
+    tbody.innerHTML = "";
+
+    data.forEach(l => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${l.license_key}</td>
+        <td class="${l.active ? 'success' : 'danger'}">${l.active}</td>
+        <td>${l.max_devices}</td>
+        <td>${l.expires_at ?? "-"}</td>
+        <td>
+          <button onclick="revoke('${l.license_key}')">Revoke</button>
+          <button onclick="reactivate('${l.license_key}')">Reactivate</button>
+          <button onclick="removeLicense('${l.license_key}')">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function createLicense() {
+    const days = +document.getElementById("days").value;
+    const max = +document.getElementById("max_devices").value;
+
+    await api("/admin/licenses", {
+      method: "POST",
+      body: JSON.stringify({ days, max_devices: max })
+    });
+
+    loadLicenses();
+  }
+
+  async function revoke(key) {
+    await api(`/admin/licenses/${key}/revoke`, { method: "POST" });
+    loadLicenses();
+  }
+
+  async function reactivate(key) {
+    await api(`/admin/licenses/${key}/reactivate`, { method: "POST" });
+    loadLicenses();
+  }
+
+  async function removeLicense(key) {
+    if (!confirm("Delete license?")) return;
+    await api(`/admin/licenses/${key}`, { method: "DELETE" });
+    loadLicenses();
+  }
+
+  async function init() {
+    const session = await getSession();
+    if (!session) return;
+
+    document.getElementById("auth").classList.add("hidden");
+    document.getElementById("panel").classList.remove("hidden");
+    document.getElementById("email").textContent = session.user.email;
+
+    loadLicenses();
+  }
+
+  init();
+</script>
+
+</body>
+</html>
