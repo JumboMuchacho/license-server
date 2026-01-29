@@ -4,11 +4,13 @@ import datetime
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+import httpx
 
 from database import SessionLocal, engine
 import models
@@ -22,8 +24,13 @@ from auth import oauth_router
 load_dotenv()
 
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
+SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
+SUPABASE_PROJECT_URL = os.getenv("SUPABASE_PROJECT_URL")  # e.g. https://xyz.supabase.co
+
 if not LICENSE_SECRET:
     raise ValueError("LICENSE_SECRET not set")
+if not SUPABASE_API_KEY or not SUPABASE_PROJECT_URL:
+    raise ValueError("SUPABASE_API_KEY or SUPABASE_PROJECT_URL not set")
 
 OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
 
@@ -47,7 +54,36 @@ app.mount(
 # Routers
 # ----------------------------
 app.include_router(admin_router)   # /admin/*
-app.include_router(oauth_router)   # /admin/oauth/callback
+app.include_router(oauth_router)   # other oauth routes if any
+
+# ----------------------------
+# OAuth callback endpoint
+# ----------------------------
+@app.get("/admin/oauth/callback")
+async def oauth_callback(request: Request):
+    """
+    Supabase redirects here after Google login.
+    Exchange code for access token, then redirect to /admin-ui
+    """
+    code = request.query_params.get("code")
+    if not code:
+        return {"error": "No code received"}
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{SUPABASE_PROJECT_URL}/auth/v1/token",
+            data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": "https://license-server-lewp.onrender.com/admin/oauth/callback",
+            },
+            headers={"apikey": SUPABASE_API_KEY},
+        )
+        token_data = resp.json()
+        # Optionally, save token_data in session/cookie here for frontend
+
+    # Redirect user to frontend admin UI
+    return RedirectResponse(url="/admin-ui")
 
 # ----------------------------
 # Startup: initialize DB
@@ -81,7 +117,6 @@ class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
     client_version: Optional[str] = None
-
 
 @app.post("/verify")
 def verify(req: VerifyRequest):
