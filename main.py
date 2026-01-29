@@ -25,12 +25,12 @@ load_dotenv()
 
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
-SUPABASE_PROJECT_URL = os.getenv("SUPABASE_PROJECT_URL")  # e.g. https://xyz.supabase.co
+SUPABASE_URL = os.getenv("SUPABASE_URL")  # e.g. https://xyz.supabase.co
 
 if not LICENSE_SECRET:
     raise ValueError("LICENSE_SECRET not set")
-if not SUPABASE_API_KEY or not SUPABASE_PROJECT_URL:
-    raise ValueError("SUPABASE_API_KEY or SUPABASE_PROJECT_URL not set")
+if not SUPABASE_API_KEY or not SUPABASE_URL:
+    raise ValueError("SUPABASE_API_KEY or SUPABASE_URL not set")
 
 OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
 
@@ -71,7 +71,7 @@ async def oauth_callback(request: Request):
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            f"{SUPABASE_PROJECT_URL}/auth/v1/token",
+            f"{SUPABASE_URL}/auth/v1/token",
             data={
                 "grant_type": "authorization_code",
                 "code": code,
