@@ -16,10 +16,7 @@
       color: #e5e7eb;
       padding: 40px;
     }
-    h1 {
-      font-size: 28px;
-      margin-bottom: 20px;
-    }
+    h1 { font-size: 28px; margin-bottom: 20px; }
     button {
       background: #fff;
       color: #000;
@@ -29,23 +26,10 @@
       font-size: 14px;
       cursor: pointer;
     }
-    button:hover {
-      opacity: 0.9;
-    }
-    #panel {
-      margin-top: 30px;
-      display: none;
-    }
-    table {
-      border-collapse: collapse;
-      margin-top: 20px;
-      width: 100%;
-    }
-    th, td {
-      border-bottom: 1px solid #334155;
-      padding: 8px;
-      text-align: left;
-    }
+    button:hover { opacity: 0.9; }
+    #panel { margin-top: 30px; display: none; }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
+    th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; }
   </style>
 </head>
 <body>
@@ -63,66 +47,66 @@
 <script>
   /* ================================
      CONFIG — MUST MATCH SUPABASE
-     ================================ */
-
+  ================================ */
   const SUPABASE_URL = "https://efhcunpogynphopqcqze.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
 
-  const supabase = supabaseJs.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-  );
+  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   /* ================================
      AUTH FLOW
-     ================================ */
-
+  ================================ */
   document.getElementById("loginBtn").onclick = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: "https://license-server-lewp.onrender.com/admin-ui"
-      }
-    });
+    try {
+      await supabaseClient.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: "https://license-server-lewp.onrender.com/admin-ui" }
+      });
+    } catch (err) {
+      console.error("Login failed:", err);
+    }
   };
 
   async function getSession() {
-    const { data } = await supabase.auth.getSession();
+    const { data } = await supabaseClient.auth.getSession();
     return data.session;
   }
 
   /* ================================
      API CALLS
-     ================================ */
-
+  ================================ */
   async function fetchLicenses() {
     const session = await getSession();
     if (!session) return;
 
-    const res = await fetch("/admin/licenses", {
-      headers: {
-        Authorization: "Bearer " + session.access_token
-      }
-    });
-
-    const data = await res.json();
-    renderLicenses(data);
+    try {
+      const res = await fetch("/admin/licenses", {
+        headers: { Authorization: "Bearer " + session.access_token }
+      });
+      const data = await res.json();
+      renderLicenses(data);
+    } catch (err) {
+      console.error("Failed to fetch licenses:", err);
+    }
   }
 
   async function createLicense() {
     const session = await getSession();
     if (!session) return;
 
-    await fetch("/admin/licenses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + session.access_token
-      },
-      body: JSON.stringify({ max_devices: 1, days: 30 })
-    });
-
-    fetchLicenses();
+    try {
+      await fetch("/admin/licenses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + session.access_token
+        },
+        body: JSON.stringify({ max_devices: 1, days: 30 })
+      });
+      await fetchLicenses();
+    } catch (err) {
+      console.error("Failed to create license:", err);
+    }
   }
 
   function renderLicenses(list) {
@@ -135,7 +119,6 @@
         <th>Expires</th>
       </tr>
     `;
-
     list.forEach(l => {
       table.innerHTML += `
         <tr>
@@ -149,15 +132,21 @@
   }
 
   /* ================================
-     AUTO-LOGIN HANDLING
-     ================================ */
-
+     AUTO-LOGIN HANDLING (after redirect)
+  ================================ */
   (async () => {
     const session = await getSession();
     if (session) {
+      // Hide login button, show admin panel immediately
       document.getElementById("loginBtn").style.display = "none";
       document.getElementById("panel").style.display = "block";
       fetchLicenses();
+    } else {
+      // Optional: detect URL hash for OAuth redirect
+      const { searchParams } = new URL(window.location.href);
+      if (searchParams.get("access_token")) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
   })();
 </script>
