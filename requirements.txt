@@ -7,3 +7,4 @@ python-dotenv
 requests
 python-jose[cryptography]  # for JWT verification (if using Supabase JWT)
 PyJWT
+httpx>=1.7.0
