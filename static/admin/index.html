@@ -5,7 +5,6 @@
   <title>License Server – Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Supabase JS SDK -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
   <style>
@@ -25,11 +24,13 @@
       border-radius: 6px;
       font-size: 14px;
       cursor: pointer;
+      transition: opacity 0.2s;
     }
     button:hover { opacity: 0.9; }
     #panel { margin-top: 30px; display: none; }
     table { border-collapse: collapse; margin-top: 20px; width: 100%; }
     th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; }
+    th { background: rgba(255,255,255,0.05); }
   </style>
 </head>
 <body>
@@ -40,40 +41,45 @@
 
 <div id="panel">
   <h2>Licenses</h2>
-  <button onclick="createLicense()">Create License</button>
+  <button onclick="createLicense()">+ Create New License</button>
   <table id="licenses"></table>
 </div>
 
 <script>
   /* ================================
-     CONFIG — MUST MATCH SUPABASE
+      CONFIG — MUST MATCH SUPABASE
   ================================ */
   const SUPABASE_URL = "https://efhcunpogynphopqcqze.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
 
+  // Use the global 'supabase' object provided by the CDN script
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   /* ================================
-     AUTH FLOW
+      AUTH FLOW (FIXED HANDLER)
   ================================ */
-  document.getElementById("loginBtn").onclick = async () => {
-    try {
-      await supabaseClient.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo: "https://license-server-lewp.onrender.com/admin-ui" }
-      });
-    } catch (err) {
-      console.error("Login failed:", err);
-    }
-  };
+  
+  // Direct call without async/await to ensure the browser processes the redirect immediately
+  document.getElementById("loginBtn").addEventListener("click", () => {
+    supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: { 
+        redirectTo: "https://license-server-lewp.onrender.com/admin-ui" 
+      }
+    }).catch(err => {
+      console.error("Login redirect failed:", err);
+      alert("Error starting Google login. Check console.");
+    });
+  });
 
   async function getSession() {
-    const { data } = await supabaseClient.auth.getSession();
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) console.error("Session error:", error);
     return data.session;
   }
 
   /* ================================
-     API CALLS
+      API CALLS
   ================================ */
   async function fetchLicenses() {
     const session = await getSession();
@@ -83,6 +89,12 @@
       const res = await fetch("/admin/licenses", {
         headers: { Authorization: "Bearer " + session.access_token }
       });
+      
+      if (res.status === 403) {
+        alert("Access denied: You are not on the admin allowlist.");
+        return;
+      }
+
       const data = await res.json();
       renderLicenses(data);
     } catch (err) {
@@ -95,7 +107,7 @@
     if (!session) return;
 
     try {
-      await fetch("/admin/licenses", {
+      const res = await fetch("/admin/licenses", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,7 +115,13 @@
         },
         body: JSON.stringify({ max_devices: 1, days: 30 })
       });
-      await fetchLicenses();
+      
+      if (res.ok) {
+        await fetchLicenses();
+      } else {
+        const errData = await res.json();
+        alert("Error: " + (errData.detail || "Could not create license"));
+      }
     } catch (err) {
       console.error("Failed to create license:", err);
     }
@@ -111,6 +129,8 @@
 
   function renderLicenses(list) {
     const table = document.getElementById("licenses");
+    if (!list || !Array.isArray(list)) return;
+
     table.innerHTML = `
       <tr>
         <th>Key</th>
@@ -122,31 +142,25 @@
     list.forEach(l => {
       table.innerHTML += `
         <tr>
-          <td>${l.license_key}</td>
-          <td>${l.active}</td>
+          <td><code>${l.license_key}</code></td>
+          <td style="color: ${l.active ? '#4ade80' : '#f87171'}">${l.active}</td>
           <td>${l.max_devices}</td>
-          <td>${l.expires_at || "-"}</td>
+          <td>${l.expires_at ? new Date(l.expires_at).toLocaleDateString() : "-"}</td>
         </tr>
       `;
     });
   }
 
   /* ================================
-     AUTO-LOGIN HANDLING (after redirect)
+      INITIAL LOAD / REDIRECT CHECK
   ================================ */
   (async () => {
     const session = await getSession();
     if (session) {
-      // Hide login button, show admin panel immediately
+      // User is logged in
       document.getElementById("loginBtn").style.display = "none";
       document.getElementById("panel").style.display = "block";
       fetchLicenses();
-    } else {
-      // Optional: detect URL hash for OAuth redirect
-      const { searchParams } = new URL(window.location.href);
-      if (searchParams.get("access_token")) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
     }
   })();
 </script>
