@@ -1,7 +1,6 @@
-# server/admin_routes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from auth import verify_oauth
 import models
 from database import get_db
@@ -23,8 +22,9 @@ class LicenseOut(BaseModel):
     license_key: str
     active: bool
     max_devices: int
-    expires_at: str = None
-    assigned_users: str = None
+    expires_at: Optional[str] = None
+    # Changed str to list to handle JSON data
+    assigned_users: Optional[List] = []
 
 # ------------------------------
 # Helper
@@ -47,7 +47,7 @@ def list_licenses(user: dict = Depends(verify_oauth), db: Session = Depends(get_
             "active": l.active,
             "max_devices": l.max_devices,
             "expires_at": l.expires_at.isoformat() if l.expires_at else None,
-            "assigned_users": l.assigned_users,
+            "assigned_users": l.assigned_users if l.assigned_users is not None else [],
         }
         for l in licenses
     ]
@@ -63,6 +63,7 @@ def create_license(payload: LicenseCreate, user: dict = Depends(verify_oauth), d
         max_devices=payload.max_devices,
         active=payload.active,
         expires_at=expires_at,
+        assigned_users=[] # Initialize as empty list
     )
 
     db.add(new_license)
@@ -79,30 +80,27 @@ def create_license(payload: LicenseCreate, user: dict = Depends(verify_oauth), d
 
 @router.post("/licenses/{license_key}/revoke")
 def revoke_license(license_key: str, user: dict = Depends(verify_oauth), db: Session = Depends(get_db)):
-    """Deactivate a license."""
     lic = db.query(models.License).filter_by(license_key=license_key).first()
     if not lic:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="License not found")
+        raise HTTPException(status_code=404, detail="License not found")
     lic.active = False
     db.commit()
     return {"message": f"License {license_key} revoked."}
 
 @router.post("/licenses/{license_key}/reactivate")
 def reactivate_license(license_key: str, user: dict = Depends(verify_oauth), db: Session = Depends(get_db)):
-    """Reactivate a license."""
     lic = db.query(models.License).filter_by(license_key=license_key).first()
     if not lic:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="License not found")
+        raise HTTPException(status_code=404, detail="License not found")
     lic.active = True
     db.commit()
     return {"message": f"License {license_key} reactivated."}
 
 @router.delete("/licenses/{license_key}")
 def delete_license(license_key: str, user: dict = Depends(verify_oauth), db: Session = Depends(get_db)):
-    """Delete a license."""
     lic = db.query(models.License).filter_by(license_key=license_key).first()
     if not lic:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="License not found")
+        raise HTTPException(status_code=404, detail="License not found")
     db.delete(lic)
     db.commit()
     return {"message": f"License {license_key} deleted."}

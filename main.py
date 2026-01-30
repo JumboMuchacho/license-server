@@ -15,6 +15,7 @@ import httpx
 from database import SessionLocal, engine
 import models
 from security import sign_payload
+# Import the admin router
 from admin_routes import router as admin_router
 from auth import oauth_router
 
@@ -25,7 +26,7 @@ load_dotenv()
 
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")  # e.g. https://xyz.supabase.co
+SUPABASE_URL = os.getenv("SUPABASE_URL") 
 
 if not LICENSE_SECRET:
     raise ValueError("LICENSE_SECRET not set")
@@ -42,6 +43,13 @@ logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="License Server")
 
 # ----------------------------
+# Routers
+# ----------------------------
+# Including the admin router as requested
+app.include_router(admin_router)   # /admin/*
+app.include_router(oauth_router)   # other oauth routes
+
+# ----------------------------
 # Static Admin UI
 # ----------------------------
 app.mount(
@@ -51,19 +59,12 @@ app.mount(
 )
 
 # ----------------------------
-# Routers
-# ----------------------------
-app.include_router(admin_router)   # /admin/*
-app.include_router(oauth_router)   # other oauth routes if any
-
-# ----------------------------
 # OAuth callback endpoint
 # ----------------------------
 @app.get("/admin/oauth/callback")
 async def oauth_callback(request: Request):
     """
     Supabase redirects here after Google login.
-    Exchange code for access token, then redirect to /admin-ui
     """
     code = request.query_params.get("code")
     if not code:
@@ -80,9 +81,7 @@ async def oauth_callback(request: Request):
             headers={"apikey": SUPABASE_API_KEY},
         )
         token_data = resp.json()
-        # Optionally, save token_data in session/cookie here for frontend
 
-    # Redirect user to frontend admin UI
     return RedirectResponse(url="/admin-ui")
 
 # ----------------------------
@@ -97,15 +96,12 @@ def startup():
         logging.error(f"DB error: {e}")
 
 # ----------------------------
-# Health
+# Health & Root
 # ----------------------------
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# ----------------------------
-# Root
-# ----------------------------
 @app.get("/")
 def index():
     return {"message": "License Server running"}
@@ -163,12 +159,8 @@ def verify(req: VerifyRequest):
     finally:
         db.close()
 
-# ----------------------------
-# Local run
-# ----------------------------
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(
         app,
         host=os.getenv("HOST", "0.0.0.0"),

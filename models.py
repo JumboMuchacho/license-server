@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -10,6 +10,9 @@ class License(Base):
     active = Column(Boolean, default=True)
     max_devices = Column(Integer, default=1)
     expires_at = Column(DateTime)
+    
+    # ADDED THIS: Matches the column in your Supabase DB
+    assigned_users = Column(JSON, default=[])
 
     devices = relationship("Device", back_populates="license", cascade="all,delete")
 
