@@ -4,20 +4,16 @@ import datetime
 import logging
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-import httpx
 
 from database import SessionLocal, engine
 import models
 from security import sign_payload
-# Import the admin router
 from admin_routes import router as admin_router
-from auth import oauth_router
 
 # ----------------------------
 # Load environment variables
@@ -25,13 +21,14 @@ from auth import oauth_router
 load_dotenv()
 
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
-SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL") 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 if not LICENSE_SECRET:
     raise ValueError("LICENSE_SECRET not set")
-if not SUPABASE_API_KEY or not SUPABASE_URL:
-    raise ValueError("SUPABASE_API_KEY or SUPABASE_URL not set")
+
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    raise ValueError("Supabase env vars not set")
 
 OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
 
@@ -45,9 +42,7 @@ app = FastAPI(title="License Server")
 # ----------------------------
 # Routers
 # ----------------------------
-# Including the admin router as requested
 app.include_router(admin_router)   # /admin/*
-app.include_router(oauth_router)   # other oauth routes
 
 # ----------------------------
 # Static Admin UI
@@ -57,32 +52,6 @@ app.mount(
     StaticFiles(directory="static/admin", html=True),
     name="admin-ui",
 )
-
-# ----------------------------
-# OAuth callback endpoint
-# ----------------------------
-@app.get("/admin/oauth/callback")
-async def oauth_callback(request: Request):
-    """
-    Supabase redirects here after Google login.
-    """
-    code = request.query_params.get("code")
-    if not code:
-        return {"error": "No code received"}
-
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{SUPABASE_URL}/auth/v1/token",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": "https://license-server-lewp.onrender.com/admin/oauth/callback",
-            },
-            headers={"apikey": SUPABASE_API_KEY},
-        )
-        token_data = resp.json()
-
-    return RedirectResponse(url="/admin-ui")
 
 # ----------------------------
 # Startup: initialize DB
@@ -107,7 +76,7 @@ def index():
     return {"message": "License Server running"}
 
 # ----------------------------
-# License verification
+# License verification (PUBLIC)
 # ----------------------------
 class VerifyRequest(BaseModel):
     license_key: str
@@ -141,7 +110,10 @@ def verify(req: VerifyRequest):
             if count >= lic.max_devices:
                 raise HTTPException(429, "Device limit reached")
 
-            db.add(models.Device(license_id=lic.id, device_id=req.device_id))
+            db.add(models.Device(
+                license_id=lic.id,
+                device_id=req.device_id
+            ))
             db.commit()
 
         expires = int(time.time()) + OFFLINE_TTL_HOURS * 3600

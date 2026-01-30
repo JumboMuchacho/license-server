@@ -1,32 +1,34 @@
 import os
 import requests
-from fastapi import APIRouter, Security, HTTPException, status
-from fastapi.security import HTTPBearer
+from fastapi import Security, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-oauth_scheme = HTTPBearer()
+security = HTTPBearer()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
     raise RuntimeError("Supabase environment variables not set")
 
-oauth_router = APIRouter(prefix="/admin/oauth", tags=["oauth"])
 
-
-def verify_oauth(token=Security(oauth_scheme)) -> dict:
+def verify_oauth(
+    creds: HTTPAuthorizationCredentials = Security(security),
+) -> dict:
     """
-    Verify Supabase JWT access token.
+    Verifies Supabase JWT access token.
+    Client must send:
+      Authorization: Bearer <access_token>
     """
     headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {token.credentials}",
+        "apikey": SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {creds.credentials}",
     }
 
     resp = requests.get(
         f"{SUPABASE_URL}/auth/v1/user",
         headers=headers,
-        timeout=20,
+        timeout=15,
     )
 
     if resp.status_code != 200:
@@ -37,7 +39,6 @@ def verify_oauth(token=Security(oauth_scheme)) -> dict:
 
     user = resp.json()
 
-    # Optional admin allowlist
     allowed_admins = [
         email.strip()
         for email in os.getenv("ADMIN_EMAILS", "").split(",")
@@ -51,17 +52,3 @@ def verify_oauth(token=Security(oauth_scheme)) -> dict:
         )
 
     return user
-
-
-@oauth_router.get("/callback")
-def oauth_callback(code: str):
-    """
-    Supabase OAuth redirect endpoint.
-
-    Supabase exchanges the code internally and redirects
-    the browser to the admin UI with an active session.
-    """
-    return {
-        "status": "ok",
-        "message": "OAuth login successful. You may close this tab.",
-    }
