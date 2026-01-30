@@ -5,40 +5,48 @@
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #0f172a; color: white; }
-        input, select { margin: 5px; padding: 8px; border-radius: 4px; border: none; }
-        button { padding: 8px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; }
+        input, select { margin: 5px; padding: 8px; border-radius: 4px; border: none; width: 250px; }
+        button { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; margin-top: 5px; }
         .primary { background: #22c55e; color: black; }
+        .secondary { background: #475569; color: white; }
         .hidden { display: none; }
-        pre { background: #1e293b; padding: 15px; border-radius: 8px; overflow: auto; }
+        pre { background: #1e293b; padding: 15px; border-radius: 8px; overflow: auto; border: 1px solid #334155; }
+        .container { max-width: 800px; margin: auto; }
     </style>
 </head>
 <body>
 
-    <div id="login-section">
-        <h2>Admin Login</h2>
-        <button class="primary" onclick="login()">Login with Google</button>
-    </div>
+    <div class="container">
+        <div id="login-section">
+            <h2>Admin Login</h2>
+            <p>Access restricted to authorized administrators.</p>
+            <button class="primary" onclick="login()">Login with Google</button>
+        </div>
 
-    <div id="admin-panel" class="hidden">
-        <h2>Create License</h2>
-        <input id="max_devices" type="number" placeholder="Max devices" value="1"><br>
-        <input id="days" type="number" placeholder="Duration (days)" value="30"><br>
-        <input id="user_email" type="text" placeholder="Assign User Email (Optional)"><br>
-        <button class="primary" onclick="create()">Create License</button>
-        <button onclick="logout()">Logout</button>
+        <div id="admin-panel" class="hidden">
+            <h2>Create License</h2>
+            <input id="max_devices" type="number" placeholder="Max devices" value="1"><br>
+            <input id="days" type="number" placeholder="Duration (days)" value="30"><br>
+            <input id="user_email" type="text" placeholder="Assign User Email (Optional)"><br>
+            <button class="primary" onclick="create()">Create License</button>
+            <button class="secondary" onclick="logout()">Logout</button>
 
-        <h2>Licenses</h2>
-        <pre id="out">Loading...</pre>
+            <h2>Current Licenses</h2>
+            <button class="secondary" onclick="load()">Refresh List</button>
+            <pre id="out">Loading licenses...</pre>
+        </div>
     </div>
 
 <script>
-    // Replace with your actual project values from Supabase Dashboard
+    // 1. Correct Initialization
     const SB_URL = "https://efhcunpogynphopqcqze.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
-    const supabase = supabase.createClient(SB_URL, SB_KEY);
+    
+    // Note the lowercase 'supabase' for the client creator
+    const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
     async function checkUser() {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await _supabase.auth.getSession();
         if (session) {
             document.getElementById("login-section").classList.add("hidden");
             document.getElementById("admin-panel").classList.remove("hidden");
@@ -47,19 +55,28 @@
     }
 
     async function login() {
-        await supabase.auth.signInWithOAuth({
+        // Automatically determines if /admin-ui or /admin-ui/ is needed
+        const targetUrl = window.location.origin + window.location.pathname;
+        
+        const { error } = await _supabase.auth.signInWithOAuth({
             provider: 'google',
-            options: { redirectTo: window.location.origin + '/admin-ui/' }
+            options: { 
+                redirectTo: targetUrl 
+            }
         });
+
+        if (error) {
+            alert("Login failed: " + error.message);
+        }
     }
 
     async function logout() {
-        await supabase.auth.signOut();
+        await _supabase.auth.signOut();
         location.reload();
     }
 
     async function getHeaders() {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await _supabase.auth.getSession();
         return {
             "Authorization": "Bearer " + session?.access_token,
             "Content-Type": "application/json"
@@ -67,15 +84,25 @@
     }
 
     async function load() {
-        const headers = await getHeaders();
-        const r = await fetch("/admin/licenses", { headers });
-        const d = await r.json();
-        document.getElementById("out").textContent = JSON.stringify(d, null, 2);
+        try {
+            const headers = await getHeaders();
+            const r = await fetch("/admin/licenses", { headers });
+            
+            if (r.status === 403 || r.status === 401) {
+                document.getElementById("out").textContent = "Access Denied: You are not an authorized admin email.";
+                return;
+            }
+
+            const d = await r.json();
+            document.getElementById("out").textContent = JSON.stringify(d, null, 2);
+        } catch (err) {
+            document.getElementById("out").textContent = "Error loading licenses.";
+        }
     }
 
     async function create() {
         const headers = await getHeaders();
-        await fetch("/admin/licenses", {
+        const response = await fetch("/admin/licenses", {
             method: "POST",
             headers,
             body: JSON.stringify({
@@ -84,9 +111,16 @@
                 assigned_users: document.getElementById("user_email").value ? [document.getElementById("user_email").value] : []
             })
         });
-        load();
+
+        if (response.ok) {
+            load();
+        } else {
+            const errData = await response.json();
+            alert("Failed to create: " + (errData.detail || "Unknown error"));
+        }
     }
 
+    // Run check on page load
     checkUser();
 </script>
 </body>
