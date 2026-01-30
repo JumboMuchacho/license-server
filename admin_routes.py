@@ -25,7 +25,7 @@ class LicenseOut(BaseModel):
     license_key: str
     active: bool
     max_devices: int
-    expires_at: Optional[str] = None
+    expires_at: Optional[str]
     assigned_users: List[Any] = []
 
     @field_validator("assigned_users", mode="before")
@@ -36,7 +36,7 @@ class LicenseOut(BaseModel):
                 return json.loads(v)
             except:
                 return []
-        return v if v is not None else []
+        return v or []
 
 
 def generate_license_key():
@@ -45,7 +45,7 @@ def generate_license_key():
 
 @router.get("/licenses", response_model=List[LicenseOut])
 def list_licenses(
-    user: dict = Depends(verify_oauth),
+    user=Depends(verify_oauth),
     db: Session = Depends(get_db),
 ):
     licenses = db.query(models.License).all()
@@ -64,67 +64,24 @@ def list_licenses(
 @router.post("/licenses", response_model=LicenseOut)
 def create_license(
     payload: LicenseCreate,
-    user: dict = Depends(verify_oauth),
+    user=Depends(verify_oauth),
     db: Session = Depends(get_db),
 ):
-    new_license = models.License(
+    lic = models.License(
         license_key=generate_license_key(),
         max_devices=payload.max_devices,
         active=payload.active,
         expires_at=datetime.utcnow() + timedelta(days=payload.days),
         assigned_users=payload.assigned_users,
     )
-
-    db.add(new_license)
+    db.add(lic)
     db.commit()
-    db.refresh(new_license)
+    db.refresh(lic)
 
     return {
-        "license_key": new_license.license_key,
-        "active": new_license.active,
-        "max_devices": new_license.max_devices,
-        "expires_at": new_license.expires_at.isoformat(),
-        "assigned_users": new_license.assigned_users,
+        "license_key": lic.license_key,
+        "active": lic.active,
+        "max_devices": lic.max_devices,
+        "expires_at": lic.expires_at.isoformat(),
+        "assigned_users": lic.assigned_users,
     }
-
-
-@router.post("/licenses/{license_key}/revoke")
-def revoke_license(
-    license_key: str,
-    user: dict = Depends(verify_oauth),
-    db: Session = Depends(get_db),
-):
-    lic = db.query(models.License).filter_by(license_key=license_key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
-    lic.active = False
-    db.commit()
-    return {"message": "License revoked"}
-
-
-@router.post("/licenses/{license_key}/reactivate")
-def reactivate_license(
-    license_key: str,
-    user: dict = Depends(verify_oauth),
-    db: Session = Depends(get_db),
-):
-    lic = db.query(models.License).filter_by(license_key=license_key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
-    lic.active = True
-    db.commit()
-    return {"message": "License reactivated"}
-
-
-@router.delete("/licenses/{license_key}")
-def delete_license(
-    license_key: str,
-    user: dict = Depends(verify_oauth),
-    db: Session = Depends(get_db),
-):
-    lic = db.query(models.License).filter_by(license_key=license_key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
-    db.delete(lic)
-    db.commit()
-    return {"message": "License deleted"}

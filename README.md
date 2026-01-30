@@ -78,12 +78,11 @@ Copatible with:
 * Supabase Postgres 
 * VPS/Docker
 
-## 3️⃣ Admin panel architecture (simple & clean)
-/admin
- ├── GET  /admin/login        → Login page
- ├── POST /admin/login        → Auth
- ├── GET  /admin/dashboard    → UI
- ├── POST /admin/licenses     → Create license
- ├── POST /admin/revoke/{key}
- ├── POST /admin/extend/{key}
+## 🔐 Auth Architecture (Clean & Correct)
+In Production:
+Layer	Responsibility
+Browser (Admin UI)	Login with Supabase JS, store session
+Supabase	Google OAuth, token issuance, refresh
+FastAPI	Verify JWT via /auth/v1/user
+Database	Trusts FastAPI only
 
