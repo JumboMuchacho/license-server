@@ -4,166 +4,140 @@
   <meta charset="UTF-8" />
   <title>License Server – Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, sans-serif;
-      background: radial-gradient(circle at top, #0f172a, #020617);
-      color: #e5e7eb;
-      padding: 40px;
-    }
-    h1 { font-size: 28px; margin-bottom: 20px; }
-    button {
-      background: #fff;
-      color: #000;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    button:hover { opacity: 0.9; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #020617; color: #e5e7eb; padding: 40px; }
+    h1 { font-size: 28px; margin-bottom: 20px; color: #f8fafc; }
+    .card { background: #0f172a; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px #000; }
+    button { background: #f8fafc; color: #020617; padding: 8px 16px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    button:hover { background: #e2e8f0; transform: translateY(-1px); }
+    button.secondary { background: #334155; color: white; margin-left: 5px; }
+    button.danger { background: #7f1d1d; color: #fecaca; margin-left: 5px; }
+    button.danger:hover { background: #b91c1c; }
     #panel { margin-top: 30px; display: none; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    th, td { border-bottom: 1px solid #334155; padding: 8px; text-align: left; }
-    th { background: rgba(255,255,255,0.05); }
+    table { border-collapse: collapse; margin-top: 20px; width: 100%; font-size: 14px; }
+    th, td { border-bottom: 1px solid #1e293b; padding: 12px; text-align: left; }
+    th { color: #94a3b8; font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; }
+    code { background: #1e293b; padding: 4px 8px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+    .status-pill { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-<h1>🔐 License Server – Admin</h1>
-
+<h1>🔐 License Server Admin</h1>
 <button id="loginBtn">Sign in with Google</button>
 
-<div id="panel">
-  <h2>Licenses</h2>
-  <button onclick="createLicense()">+ Create New License</button>
+<div id="panel" class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="margin:0">Active Licenses</h2>
+    <button onclick="createLicense()">+ Create New License</button>
+  </div>
   <table id="licenses"></table>
 </div>
 
 <script>
-  /* ================================
-      CONFIG — MUST MATCH SUPABASE
-  ================================ */
   const SUPABASE_URL = "https://efhcunpogynphopqcqze.supabase.co";
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
 
-  // Use the global 'supabase' object provided by the CDN script
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  /* ================================
-      AUTH FLOW (FIXED HANDLER)
-  ================================ */
-  
-  // Direct call without async/await to ensure the browser processes the redirect immediately
   document.getElementById("loginBtn").addEventListener("click", () => {
     supabaseClient.auth.signInWithOAuth({
       provider: "google",
-      options: { 
-        redirectTo: "https://license-server-lewp.onrender.com/admin-ui" 
-      }
-    }).catch(err => {
-      console.error("Login redirect failed:", err);
-      alert("Error starting Google login. Check console.");
+      options: { redirectTo: window.location.origin + "/admin-ui" }
     });
   });
 
   async function getSession() {
-    const { data, error } = await supabaseClient.auth.getSession();
-    if (error) console.error("Session error:", error);
+    const { data } = await supabaseClient.auth.getSession();
     return data.session;
   }
 
-  /* ================================
-      API CALLS
-  ================================ */
-  async function fetchLicenses() {
+  async function apiCall(path, method = 'GET', body = null) {
     const session = await getSession();
     if (!session) return;
-
-    try {
-      const res = await fetch("/admin/licenses", {
-        headers: { Authorization: "Bearer " + session.access_token }
-      });
-      
-      if (res.status === 403) {
-        alert("Access denied: You are not on the admin allowlist.");
-        return;
+    const options = {
+      method,
+      headers: { 
+        "Authorization": "Bearer " + session.access_token,
+        "Content-Type": "application/json"
       }
-
-      const data = await res.json();
-      renderLicenses(data);
-    } catch (err) {
-      console.error("Failed to fetch licenses:", err);
+    };
+    if (body) options.body = JSON.stringify(body);
+    
+    const res = await fetch(path, options);
+    if (!res.ok) {
+        const err = await res.json();
+        alert("Error: " + (err.detail || "Request failed"));
+        return null;
     }
+    return res.json();
+  }
+
+  async function fetchLicenses() {
+    const data = await apiCall("/admin/licenses");
+    if (data) renderLicenses(data);
   }
 
   async function createLicense() {
-    const session = await getSession();
-    if (!session) return;
+    const res = await apiCall("/admin/licenses", "POST", { max_devices: 1, days: 30 });
+    if (res) fetchLicenses();
+  }
 
-    try {
-      const res = await fetch("/admin/licenses", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + session.access_token
-        },
-        body: JSON.stringify({ max_devices: 1, days: 30 })
-      });
-      
-      if (res.ok) {
-        await fetchLicenses();
-      } else {
-        const errData = await res.json();
-        alert("Error: " + (errData.detail || "Could not create license"));
-      }
-    } catch (err) {
-      console.error("Failed to create license:", err);
-    }
+  async function toggleLicense(key, active) {
+    const action = active ? 'revoke' : 'reactivate';
+    const res = await apiCall(`/admin/licenses/${key}/${action}`, "POST");
+    if (res) fetchLicenses();
+  }
+
+  async function deleteLicense(key) {
+    if (!confirm(`Permanently delete license ${key}?`)) return;
+    const res = await apiCall(`/admin/licenses/${key}`, "DELETE");
+    if (res) fetchLicenses();
   }
 
   function renderLicenses(list) {
     const table = document.getElementById("licenses");
-    if (!list || !Array.isArray(list)) return;
+    document.getElementById("loginBtn").style.display = "none";
+    document.getElementById("panel").style.display = "block";
 
     table.innerHTML = `
       <tr>
-        <th>Key</th>
-        <th>Active</th>
-        <th>Max Devices</th>
+        <th>License Key</th>
+        <th>Status</th>
+        <th>Devices</th>
         <th>Expires</th>
+        <th>Assigned Users</th>
+        <th>Actions</th>
       </tr>
     `;
     list.forEach(l => {
+      const statusColor = l.active ? '#166534' : '#7f1d1d';
+      const statusText = l.active ? 'ACTIVE' : 'REVOKED';
+      const users = (l.assigned_users && l.assigned_users.length) ? l.assigned_users.join(", ") : "None";
+
       table.innerHTML += `
         <tr>
           <td><code>${l.license_key}</code></td>
-          <td style="color: ${l.active ? '#4ade80' : '#f87171'}">${l.active}</td>
+          <td><span class="status-pill" style="background:${statusColor}">${statusText}</span></td>
           <td>${l.max_devices}</td>
           <td>${l.expires_at ? new Date(l.expires_at).toLocaleDateString() : "-"}</td>
+          <td style="font-size:12px; color:#94a3b8">${users}</td>
+          <td>
+            <button class="secondary" onclick="toggleLicense('${l.license_key}', ${l.active})">
+              ${l.active ? 'Revoke' : 'Activate'}
+            </button>
+            <button class="danger" onclick="deleteLicense('${l.license_key}')">Delete</button>
+          </td>
         </tr>
       `;
     });
   }
 
-  /* ================================
-      INITIAL LOAD / REDIRECT CHECK
-  ================================ */
   (async () => {
     const session = await getSession();
-    if (session) {
-      // User is logged in
-      document.getElementById("loginBtn").style.display = "none";
-      document.getElementById("panel").style.display = "block";
-      fetchLicenses();
-    }
+    if (session) fetchLicenses();
   })();
 </script>
-
 </body>
 </html>
