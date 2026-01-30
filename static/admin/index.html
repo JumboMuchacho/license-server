@@ -1,57 +1,93 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>License Admin</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px }
-    input { margin: 5px }
-  </style>
+    <title>License Admin</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #0f172a; color: white; }
+        input, select { margin: 5px; padding: 8px; border-radius: 4px; border: none; }
+        button { padding: 8px 15px; cursor: pointer; border-radius: 4px; border: none; font-weight: bold; }
+        .primary { background: #22c55e; color: black; }
+        .hidden { display: none; }
+        pre { background: #1e293b; padding: 15px; border-radius: 8px; overflow: auto; }
+    </style>
 </head>
 <body>
 
-<h2>Create License</h2>
+    <div id="login-section">
+        <h2>Admin Login</h2>
+        <button class="primary" onclick="login()">Login with Google</button>
+    </div>
 
-<input id="key" placeholder="LICENSE-KEY"><br>
-<input id="devices" type="number" placeholder="Max devices"><br>
-<input id="days" type="number" placeholder="Expires in days (0 = never)"><br>
-<button onclick="create()">Create</button>
+    <div id="admin-panel" class="hidden">
+        <h2>Create License</h2>
+        <input id="max_devices" type="number" placeholder="Max devices" value="1"><br>
+        <input id="days" type="number" placeholder="Duration (days)" value="30"><br>
+        <input id="user_email" type="text" placeholder="Assign User Email (Optional)"><br>
+        <button class="primary" onclick="create()">Create License</button>
+        <button onclick="logout()">Logout</button>
 
-<h2>Licenses</h2>
-<pre id="out"></pre>
+        <h2>Licenses</h2>
+        <pre id="out">Loading...</pre>
+    </div>
 
 <script>
-const token = localStorage.getItem("ADMIN_TOKEN")
-if (!token) {
-  const t = prompt("Enter ADMIN TOKEN")
-  localStorage.setItem("ADMIN_TOKEN", t)
-  location.reload()
-}
+    // Replace with your actual project values from Supabase Dashboard
+    const SB_URL = "https://your-project.supabase.co";
+    const SB_KEY = "your-anon-public-key";
+    const supabase = supabase.createClient(SB_URL, SB_KEY);
 
-const headers = () => ({
-  "Authorization": "Bearer " + localStorage.getItem("ADMIN_TOKEN"),
-  "Content-Type": "application/json"
-})
+    async function checkUser() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            document.getElementById("login-section").classList.add("hidden");
+            document.getElementById("admin-panel").classList.remove("hidden");
+            load();
+        }
+    }
 
-function load() {
-  fetch("/admin/licenses", { headers: headers() })
-    .then(r => r.json())
-    .then(d => out.textContent = JSON.stringify(d, null, 2))
-}
+    async function login() {
+        await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin + '/admin-ui/' }
+        });
+    }
 
-function create() {
-  fetch("/admin/licenses", {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({
-      license_key: key.value,
-      max_devices: devices.value,
-      expires_in_days: days.value
-    })
-  }).then(load)
-}
+    async function logout() {
+        await supabase.auth.signOut();
+        location.reload();
+    }
 
-load()
+    async function getHeaders() {
+        const { data: { session } } = await supabase.auth.getSession();
+        return {
+            "Authorization": "Bearer " + session?.access_token,
+            "Content-Type": "application/json"
+        };
+    }
+
+    async function load() {
+        const headers = await getHeaders();
+        const r = await fetch("/admin/licenses", { headers });
+        const d = await r.json();
+        document.getElementById("out").textContent = JSON.stringify(d, null, 2);
+    }
+
+    async function create() {
+        const headers = await getHeaders();
+        await fetch("/admin/licenses", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                max_devices: parseInt(document.getElementById("max_devices").value),
+                days: parseInt(document.getElementById("days").value),
+                assigned_users: document.getElementById("user_email").value ? [document.getElementById("user_email").value] : []
+            })
+        });
+        load();
+    }
+
+    checkUser();
 </script>
-
 </body>
 </html>
