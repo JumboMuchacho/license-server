@@ -14,7 +14,6 @@ from auth import verify_oauth
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 # --- Schemas ---
-
 class LicenseCreate(BaseModel):
     max_devices: int = 1
     days: int = 30
@@ -32,24 +31,18 @@ class LicenseOut(BaseModel):
     @classmethod
     def ensure_list(cls, v):
         if isinstance(v, str):
-            try:
-                return json.loads(v)
-            except:
-                return []
+            try: return json.loads(v)
+            except: return []
         return v or []
 
 # --- Helpers ---
-
 def generate_license_key():
     return "-".join(secrets.token_hex(2).upper() for _ in range(5))
 
 # --- Routes ---
 
 @router.get("/licenses", response_model=List[LicenseOut])
-def list_licenses(
-    user=Depends(verify_oauth),
-    db: Session = Depends(get_db),
-):
+def list_licenses(user=Depends(verify_oauth), db: Session = Depends(get_db)):
     licenses = db.query(models.License).all()
     return [
         {
@@ -63,12 +56,7 @@ def list_licenses(
     ]
 
 @router.post("/licenses", response_model=LicenseOut)
-def create_license(
-    payload: LicenseCreate,
-    user=Depends(verify_oauth),
-    db: Session = Depends(get_db),
-):
-    # Modern UTC time logic
+def create_license(payload: LicenseCreate, user=Depends(verify_oauth), db: Session = Depends(get_db)):
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     expiration = now_utc + timedelta(days=payload.days)
 
@@ -82,7 +70,6 @@ def create_license(
     db.add(lic)
     db.commit()
     db.refresh(lic)
-
     return {
         "license_key": lic.license_key,
         "active": lic.active,
@@ -92,40 +79,25 @@ def create_license(
     }
 
 @router.post("/licenses/{key}/revoke")
-def revoke_license(
-    key: str,
-    user=Depends(verify_oauth),
-    db: Session = Depends(get_db)
-):
+def revoke_license(key: str, user=Depends(verify_oauth), db: Session = Depends(get_db)):
     lic = db.query(models.License).filter_by(license_key=key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
+    if not lic: raise HTTPException(404, "License not found")
     lic.active = False
     db.commit()
     return {"status": "revoked"}
 
 @router.post("/licenses/{key}/reactivate")
-def reactivate_license(
-    key: str,
-    user=Depends(verify_oauth),
-    db: Session = Depends(get_db)
-):
+def reactivate_license(key: str, user=Depends(verify_oauth), db: Session = Depends(get_db)):
     lic = db.query(models.License).filter_by(license_key=key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
+    if not lic: raise HTTPException(404, "License not found")
     lic.active = True
     db.commit()
     return {"status": "activated"}
 
 @router.delete("/licenses/{key}")
-def delete_license(
-    key: str,
-    user=Depends(verify_oauth),
-    db: Session = Depends(get_db)
-):
+def delete_license(key: str, user=Depends(verify_oauth), db: Session = Depends(get_db)):
     lic = db.query(models.License).filter_by(license_key=key).first()
-    if not lic:
-        raise HTTPException(404, "License not found")
+    if not lic: raise HTTPException(404, "License not found")
     db.delete(lic)
     db.commit()
     return {"status": "deleted"}
