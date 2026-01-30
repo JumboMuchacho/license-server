@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from database import Base
-import datetime
+from datetime import datetime, timezone
 
 class License(Base):
     __tablename__ = "licenses"
@@ -22,7 +22,9 @@ class Device(Base):
 
     id = Column(Integer, primary_key=True)
     license_id = Column(Integer, ForeignKey("licenses.id"), nullable=False)
-    device_id = Column(String, nullable=False)
-    last_seen = Column(DateTime, default=datetime.datetime.utcnow)
+    device_id = Column(String, unique=True, nullable=False) # Ensure uniqueness
+    
+    # Modern callable default using UTC
+    last_seen = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     license = relationship("License", back_populates="devices")
