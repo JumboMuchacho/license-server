@@ -1,167 +1,57 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>License Admin</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <style>
-        body { font-family: system-ui, sans-serif; background: #0f172a; color: #e5e7eb; padding: 30px; }
-        .container { max-width: 1000px; margin: auto; background: #020617; padding: 25px; border-radius: 10px; }
-        .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: flex-end; }
-        .controls div { display: flex; flex-direction: column; gap: 5px; }
-        input, select { padding: 8px; border-radius: 4px; border: none; background: #1e293b; color: white; }
-        button { padding: 10px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button.primary { background: #22c55e; color: #000; }
-        button.warn { background: #facc15; color: #000; }
-        button.danger { background: #ef4444; color: #fff; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #334155; text-align: left; }
-        code { background: #1e293b; padding: 2px 4px; border-radius: 4px; color: #38bdf8; }
-        .hidden { display: none; }
-    </style>
+  <title>License Admin</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px }
+    input { margin: 5px }
+  </style>
 </head>
 <body>
-<div class="container">
-    <h2>License Management</h2>
 
-    <div id="auth-section">
-        <button class="primary" id="btn-login">Sign in with Google to Manage</button>
-    </div>
+<h2>Create License</h2>
 
-    <div id="admin-section" class="hidden">
-        <div class="controls">
-            <div>
-                <label>Duration (Days)</label>
-                <select id="days">
-                    <option value="30">30</option>
-                    <option value="90">90</option>
-                    <option value="365">365</option>
-                </select>
-            </div>
-            <div>
-                <label>Max Devices</label>
-                <input type="number" id="max_devices" value="1" min="1">
-            </div>
-            <div>
-                <label>Assign User (Email)</label>
-                <input type="text" id="user_email" placeholder="optional">
-            </div>
-            <button class="primary" onclick="createLicense()">Create License</button>
-            <button class="danger" id="btn-logout">Logout</button>
-        </div>
+<input id="key" placeholder="LICENSE-KEY"><br>
+<input id="devices" type="number" placeholder="Max devices"><br>
+<input id="days" type="number" placeholder="Expires in days (0 = never)"><br>
+<button onclick="create()">Create</button>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Key</th>
-                    <th>Status</th>
-                    <th>Devices</th>
-                    <th>Expires</th>
-                    <th>Assigned</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="licenseTable"></tbody>
-        </table>
-    </div>
-</div>
+<h2>Licenses</h2>
+<pre id="out"></pre>
 
 <script>
-// UPDATE THESE WITH YOUR ACTUAL SUPABASE CREDENTIALS
-const SB_URL = "https://your-project-id.supabase.co";
-const SB_KEY = "your-anon-key";
-const supabase = supabase.createClient(SB_URL, SB_KEY);
-
-let currentToken = null;
-
-async function checkUser() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-        currentToken = session.access_token;
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('admin-section').classList.remove('hidden');
-        fetchLicenses();
-    }
+const token = localStorage.getItem("ADMIN_TOKEN")
+if (!token) {
+  const t = prompt("Enter ADMIN TOKEN")
+  localStorage.setItem("ADMIN_TOKEN", t)
+  location.reload()
 }
 
-document.getElementById('btn-login').onclick = async () => {
-    await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin + '/admin-ui/' }
-    });
-};
+const headers = () => ({
+  "Authorization": "Bearer " + localStorage.getItem("ADMIN_TOKEN"),
+  "Content-Type": "application/json"
+})
 
-document.getElementById('btn-logout').onclick = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
-};
-
-async function fetchLicenses() {
-    const res = await fetch("/admin/licenses", {
-        headers: { "Authorization": "Bearer " + currentToken }
-    });
-    if (!res.ok) return;
-
-    const data = await res.json();
-    const tbody = document.getElementById("licenseTable");
-    tbody.innerHTML = data.map(l => `
-        <tr>
-            <td><code>${l.license_key}</code></td>
-            <td>${l.active ? "✅ Active" : "❌ Revoked"}</td>
-            <td>${l.max_devices}</td>
-            <td>${l.expires_at ? new Date(l.expires_at).toLocaleDateString() : "-"}</td>
-            <td>${l.assigned_users.join(", ") || "-"}</td>
-            <td>
-                <button class="warn" onclick="toggleStatus('${l.license_key}', ${l.active})">
-                    ${l.active ? "Revoke" : "Activate"}
-                </button>
-                <button class="danger" onclick="deleteLicense('${l.license_key}')">
-                    Delete
-                </button>
-            </td>
-        </tr>
-    `).join('');
+function load() {
+  fetch("/admin/licenses", { headers: headers() })
+    .then(r => r.json())
+    .then(d => out.textContent = JSON.stringify(d, null, 2))
 }
 
-async function createLicense() {
-    const payload = {
-        days: parseInt(document.getElementById('days').value),
-        max_devices: parseInt(document.getElementById('max_devices').value),
-        assigned_users: document.getElementById('user_email').value ? [document.getElementById('user_email').value] : []
-    };
-
-    await fetch("/admin/licenses", {
-        method: "POST",
-        headers: { 
-            "Authorization": "Bearer " + currentToken,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-    });
-
-    document.getElementById('user_email').value = "";
-    fetchLicenses();
+function create() {
+  fetch("/admin/licenses", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      license_key: key.value,
+      max_devices: devices.value,
+      expires_in_days: days.value
+    })
+  }).then(load)
 }
 
-async function toggleStatus(key, active) {
-    const action = active ? "revoke" : "reactivate";
-    await fetch(`/admin/licenses/${key}/${action}`, {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + currentToken }
-    });
-    fetchLicenses();
-}
-
-async function deleteLicense(key) {
-    if (!confirm("Delete license permanently?")) return;
-    await fetch(`/admin/licenses/${key}`, {
-        method: "DELETE",
-        headers: { "Authorization": "Bearer " + currentToken }
-    });
-    fetchLicenses();
-}
-
-checkUser();
+load()
 </script>
+
 </body>
 </html>

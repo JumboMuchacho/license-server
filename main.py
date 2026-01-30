@@ -1,74 +1,138 @@
-import os
-import time
-from datetime import datetime, timezone
-import logging
-import hmac
-import hashlib
-import json
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from dotenv import load_dotenv
+from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from datetime import datetime, timedelta
+import os, json, hmac, hashlib
 
-from database import SessionLocal, engine, get_db
-import models
-from admin_routes import router as admin_router
+DATABASE_URL = os.environ["DATABASE_URL"]
+ADMIN_TOKEN = os.environ["ADMIN_TOKEN"]
+LICENSE_SECRET = os.environ["LICENSE_SECRET"]
 
-load_dotenv()
-LICENSE_SECRET = os.getenv("LICENSE_SECRET")
-OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI()
 
-app = FastAPI(title="License Server")
-app.include_router(admin_router)
-app.mount("/admin-ui", StaticFiles(directory="static/admin", html=True), name="admin-ui")
+# --------------------
+# Models
+# --------------------
+class License(Base):
+    __tablename__ = "licenses"
 
-@app.on_event("startup")
-def startup():
-    models.Base.metadata.create_all(bind=engine)
+    id = Column(Integer, primary_key=True)
+    license_key = Column(String, unique=True, nullable=False)
+    max_devices = Column(Integer, default=1)
+    expires_at = Column(Integer)
+    active = Column(Boolean, default=True)
+    devices = Column(String, default="[]")
 
-class VerifyRequest(BaseModel):
-    license_key: str
-    device_id: str
+Base.metadata.create_all(engine)
 
-def sign_payload(payload: dict) -> str:
-    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    return hmac.new(LICENSE_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+# --------------------
+# Utils
+# --------------------
+def db():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
+def admin_auth(req: Request):
+    token = req.headers.get("Authorization", "").replace("Bearer ", "")
+    if token != ADMIN_TOKEN:
+        raise HTTPException(401, "Unauthorized")
+
+def sign(payload: dict):
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    sig = hmac.new(LICENSE_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+    return sig
+
+# --------------------
+# Static Admin UI
+# --------------------
+app.mount("/admin", StaticFiles(directory="static/admin", html=True), name="admin")
+
+# --------------------
+# API
+# --------------------
 @app.post("/verify")
-def verify(req: VerifyRequest, db: Session = Depends(get_db)):
-    # 1. Modern UTC Timestamp
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+def verify(data: dict, db: Session = Depends(db)):
+    key = data.get("license_key")
+    device = data.get("device_id")
 
-    lic = db.query(models.License).filter_by(license_key=req.license_key, active=True).first()
+    lic = db.query(License).filter_by(license_key=key, active=True).first()
     if not lic:
-        raise HTTPException(status_code=404, detail="License invalid")
+        raise HTTPException(403, "Invalid license")
 
-    # 2. Expiry Check
-    if lic.expires_at and lic.expires_at < now:
-        raise HTTPException(status_code=410, detail="License expired")
+    if lic.expires_at and datetime.utcnow().timestamp() > lic.expires_at:
+        raise HTTPException(403, "Expired")
 
-    # 3. Binding Logic
-    existing_device = db.query(models.Device).filter_by(device_id=req.device_id).first()
-    if existing_device:
-        if existing_device.license_id != lic.id:
-            raise HTTPException(status_code=403, detail="Device bound to another license")
-        existing_device.last_seen = now
-        db.commit()
-    else:
-        if db.query(models.Device).filter_by(license_id=lic.id).count() >= lic.max_devices:
-            raise HTTPException(status_code=429, detail="Limit reached")
-        db.add(models.Device(license_id=lic.id, device_id=req.device_id, last_seen=now))
+    devices = json.loads(lic.devices)
+    if device not in devices:
+        if lic.max_devices != -1 and len(devices) >= lic.max_devices:
+            raise HTTPException(403, "Device limit reached")
+        devices.append(device)
+        lic.devices = json.dumps(devices)
         db.commit()
 
-    token = {"license": req.license_key, "device": req.device_id, "exp": int(time.time()) + (OFFLINE_TTL_HOURS * 3600)}
-    return {"status": "success", "token": token, "signature": sign_payload(token)}
+    token = {
+        "license": key,
+        "device": device,
+        "exp": lic.expires_at or int((datetime.utcnow() + timedelta(days=3650)).timestamp())
+    }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+    return {
+        "token": token,
+        "signature": sign(token)
+    }
+
+# --------------------
+# Admin APIs
+# --------------------
+@app.get("/admin/licenses")
+def list_licenses(req: Request, db: Session = Depends(db)):
+    admin_auth(req)
+    return db.query(License).all()
+
+@app.post("/admin/licenses")
+def create_license(data: dict, req: Request, db: Session = Depends(db)):
+    admin_auth(req)
+
+    days = int(data.get("expires_in_days", 0))
+    expires = None
+    if days > 0:
+        expires = int((datetime.utcnow() + timedelta(days=days)).timestamp())
+
+    lic = License(
+        license_key=data["license_key"],
+        max_devices=int(data.get("max_devices", 1)),
+        expires_at=expires,
+        active=True
+    )
+    db.add(lic)
+    db.commit()
+    return {"ok": True}
+
+@app.post("/admin/licenses/{key}/revoke")
+def revoke(key: str, req: Request, db: Session = Depends(db)):
+    admin_auth(req)
+    lic = db.query(License).filter_by(license_key=key).first()
+    if not lic:
+        raise HTTPException(404)
+    lic.active = False
+    db.commit()
+    return {"ok": True}
+
+@app.delete("/admin/licenses/{key}")
+def delete(key: str, req: Request, db: Session = Depends(db)):
+    admin_auth(req)
+    lic = db.query(License).filter_by(license_key=key).first()
+    if not lic:
+        raise HTTPException(404)
+    db.delete(lic)
+    db.commit()
+    return {"ok": True}
