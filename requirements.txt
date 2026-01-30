@@ -5,6 +5,6 @@ pydantic
 psycopg2-binary
 python-dotenv
 requests
-python-jose[cryptography]  # for JWT verification (if using Supabase JWT)
+python-jose # for JWT verification (if using Supabase JWT)
 PyJWT
 httpx==0.28.1
