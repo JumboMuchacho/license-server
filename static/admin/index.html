@@ -2,23 +2,40 @@
 <html>
 <head>
     <title>License Admin Console</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 30px; background: #0f172a; color: #f8fafc; }
-        .container { max-width: 1000px; margin: auto; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; margin: 0; }
+        .container { max-width: 1100px; margin: auto; }
         .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #334155; }
-        input { background: #0f172a; border: 1px solid #475569; color: white; padding: 10px; margin: 5px; border-radius: 6px; width: 180px; }
+        
+        /* Form elements */
+        input { background: #0f172a; border: 1px solid #475569; color: white; padding: 10px; margin: 5px; border-radius: 6px; width: 100%; max-width: 250px; box-sizing: border-box; }
         button { padding: 10px 18px; cursor: pointer; border-radius: 6px; border: none; font-weight: bold; transition: 0.2s; }
         .primary { background: #22c55e; color: #052e16; }
-        .primary:hover { background: #4ade80; }
         .danger { background: #ef4444; color: white; }
-        .secondary { background: #64748b; color: white; }
+        .secondary { background: #475569; color: white; }
         .hidden { display: none; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { text-align: left; background: #334155; padding: 12px; }
-        td { padding: 12px; border-bottom: 1px solid #334155; }
+        
+        /* Table responsive behavior */
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 600px; }
+        th { text-align: left; background: #334155; padding: 12px; font-size: 14px; }
+        td { padding: 12px; border-bottom: 1px solid #334155; font-size: 14px; vertical-align: middle; }
+        
+        /* User identifier dropdown */
+        .user-btn { background: #3b82f6; color: white; border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; border: none; }
+        .user-details { background: #0f172a; padding: 10px; border-radius: 6px; margin-top: 8px; font-size: 12px; border: 1px solid #3b82f6; display: none; word-break: break-all; }
         .status-active { color: #22c55e; font-weight: bold; }
-        .status-inactive { color: #94a3b8; }
+        .status-revoked { color: #94a3b8; }
+
+        /* Mobile specific fixes */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .card { padding: 15px; }
+            h2 { font-size: 1.2rem; }
+            input { max-width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -29,34 +46,38 @@
         </div>
 
         <div id="admin-panel" class="hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2>License Dashboard</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin:0;">Dashboard</h2>
                 <button class="secondary" onclick="logout()">Logout</button>
             </div>
 
             <div class="card">
                 <h3>Generate New License</h3>
-                <input id="max_devices" type="number" placeholder="Devices" value="1">
-                <input id="days" type="number" placeholder="Days Valid" value="30">
-                <input id="user_email" type="text" placeholder="User Email (optional)" style="width: 250px;">
-                <button class="primary" onclick="create()">Create</button>
+                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    <input id="max_devices" type="number" placeholder="Devices" value="1">
+                    <input id="days" type="number" placeholder="Days Valid" value="30">
+                    <input id="user_email" type="text" placeholder="User Identifier (e.g. Email)">
+                    <button class="primary" onclick="create()">Create</button>
+                </div>
             </div>
 
             <div class="card">
-                <h3>Database Records</h3>
-                <button class="secondary" onclick="load()" style="margin-bottom: 10px;">Refresh Data</button>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>License Key</th>
-                            <th>Status</th>
-                            <th>Devices</th>
-                            <th>Expires</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="license-table-body"></tbody>
-                </table>
+                <h3>Records</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Status</th>
+                                <th>Dev</th>
+                                <th>Expires</th>
+                                <th>User</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="license-table-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -87,6 +108,11 @@
         return { "Authorization": "Bearer " + session?.access_token, "Content-Type": "application/json" };
     }
 
+    function toggleUser(id) {
+        const el = document.getElementById('user-info-' + id);
+        el.style.display = el.style.display === 'block' ? 'none' : 'block';
+    }
+
     async function load() {
         const headers = await getHeaders();
         const r = await fetch("/admin/licenses", { headers });
@@ -94,15 +120,25 @@
         
         const tbody = document.getElementById("license-table-body");
         tbody.innerHTML = "";
-        data.forEach(lic => {
+        data.forEach((lic, index) => {
+            const userDisplay = (lic.assigned_users && lic.assigned_users.length > 0) 
+                ? lic.assigned_users[0] 
+                : "No data";
+
             const row = `<tr>
-                <td style="font-family: monospace;">${lic.license_key}</td>
-                <td class="${lic.active ? 'status-active' : 'status-inactive'}">${lic.active ? 'ACTIVE' : 'REVOKED'}</td>
+                <td style="font-family: monospace; font-size: 11px;">${lic.license_key}</td>
+                <td class="${lic.active ? 'status-active' : 'status-revoked'}">${lic.active ? 'ACTIVE' : 'OFF'}</td>
                 <td>${lic.max_devices}</td>
                 <td>${new Date(lic.expires_at).toLocaleDateString()}</td>
                 <td>
-                    <button onclick="toggleStatus('${lic.license_key}', ${lic.active})" style="background: #475569; font-size: 11px;">${lic.active ? 'Revoke' : 'Reactivate'}</button>
-                    <button class="danger" onclick="deleteLic('${lic.license_key}')" style="font-size: 11px;">Delete</button>
+                    <button class="user-btn" onclick="toggleUser(${index})">👤</button>
+                    <div id="user-info-${index}" class="user-details">${userDisplay}</div>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 4px;">
+                        <button onclick="toggleStatus('${lic.license_key}', ${lic.active})" style="background: #475569; font-size: 10px; padding: 6px;">${lic.active ? 'Revoke' : 'On'}</button>
+                        <button class="danger" onclick="deleteLic('${lic.license_key}')" style="font-size: 10px; padding: 6px;">Del</button>
+                    </div>
                 </td>
             </tr>`;
             tbody.innerHTML += row;
@@ -116,7 +152,7 @@
     }
 
     async function deleteLic(key) {
-        if(!confirm("Delete this license? This will disconnect all bound devices.")) return;
+        if(!confirm("Permanently delete?")) return;
         const headers = await getHeaders();
         await fetch(`/admin/licenses/${key}`, { method: 'DELETE', headers });
         load();
@@ -124,15 +160,17 @@
 
     async function create() {
         const headers = await getHeaders();
+        const iden = document.getElementById("user_email").value;
         await fetch("/admin/licenses", {
             method: "POST",
             headers,
             body: JSON.stringify({
                 max_devices: parseInt(document.getElementById("max_devices").value),
                 days: parseInt(document.getElementById("days").value),
-                assigned_users: document.getElementById("user_email").value ? [document.getElementById("user_email").value] : []
+                assigned_users: iden ? [iden] : []
             })
         });
+        document.getElementById("user_email").value = "";
         load();
     }
     checkUser();

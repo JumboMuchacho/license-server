@@ -44,13 +44,14 @@ def generate_license_key():
 @router.get("/licenses", response_model=List[LicenseOut])
 def list_licenses(user=Depends(verify_oauth), db: Session = Depends(get_db)):
     licenses = db.query(models.License).all()
+    # Explicitly ensure assigned_users is returned as a list for the UI dropdown
     return [
         {
             "license_key": l.license_key,
             "active": l.active,
             "max_devices": l.max_devices,
             "expires_at": l.expires_at.isoformat() if l.expires_at else None,
-            "assigned_users": l.assigned_users,
+            "assigned_users": l.assigned_users if isinstance(l.assigned_users, list) else [],
         }
         for l in licenses
     ]
