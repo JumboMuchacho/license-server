@@ -8,68 +8,57 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Dark Mode (Default) */
-            --bg: #0b0f1a;
-            --card-bg: #161c2d;
-            --accent: #6366f1;
-            --accent-hover: #818cf8;
-            --success: #10b981;
-            --danger: #ef4444;
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-            --border: #2d3748;
-            --input-bg: #0b0f1a;
+            --bg: #0b0f1a; --card-bg: #161c2d; --accent: #6366f1; --accent-hover: #818cf8;
+            --success: #10b981; --danger: #ef4444; --text-main: #f8fafc; --text-dim: #94a3b8;
+            --border: #2d3748; --input-bg: #0b0f1a;
         }
-
         [data-theme="light"] {
-            --bg: #f1f5f9;
-            --card-bg: #ffffff;
-            --accent: #4f46e5;
-            --accent-hover: #6366f1;
-            --success: #10b981;
-            --danger: #ef4444;
-            --text-main: #0f172a;
-            --text-dim: #64748b;
-            --border: #e2e8f0;
-            --input-bg: #f8fafc;
+            --bg: #f1f5f9; --card-bg: #ffffff; --accent: #4f46e5; --accent-hover: #6366f1;
+            --success: #10b981; --danger: #ef4444; --text-main: #0f172a; --text-dim: #64748b;
+            --border: #e2e8f0; --input-bg: #f8fafc;
         }
-
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; transition: background 0.3s, color 0.3s; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); margin: 0; line-height: 1.5; transition: background 0.3s; }
         .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
         .card { background: var(--card-bg); padding: 24px; border-radius: 16px; margin-bottom: 24px; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        
-        /* Header & Toggle */
         .header-actions { display: flex; align-items: center; gap: 12px; }
         .theme-btn { background: var(--border); color: var(--text-main); padding: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 10px; font-size: 18px; }
-
         .input-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-        input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 12px; border-radius: 8px; font-size: 14px; }
-        
-        button { padding: 10px 16px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 14px; transition: 0.2s; }
+        input { background: var(--input-bg); border: 1px solid var(--border); color: var(--text-main); padding: 10px; border-radius: 8px; font-size: 13px; }
+        button { padding: 10px 16px; cursor: pointer; border-radius: 8px; border: none; font-weight: 600; font-size: 13px; transition: 0.2s; }
         .primary { background: var(--accent); color: white; }
         .danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid var(--danger); }
         .secondary { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
-
         .hidden { display: none; }
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; padding: 16px; font-size: 11px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); }
-        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
-
-        .license-key { font-family: monospace; color: var(--accent); font-weight: 600; }
-        .user-btn { background: rgba(99, 102, 241, 0.1); color: var(--accent); padding: 5px 10px; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); }
+        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .license-key { font-family: monospace; color: var(--accent); font-weight: 600; letter-spacing: 0.5px; font-size: 13px; }
+        .user-btn { background: rgba(99, 102, 241, 0.1); color: var(--accent); padding: 4px 8px; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent); }
         
-        .user-details { background: rgba(0,0,0,0.05); padding: 15px; border-radius: 10px; margin-top: 10px; border: 1px dashed var(--accent); display: none; }
-        .device-slot { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px; background: var(--bg); border-radius: 6px; }
-        .last-seen { font-size: 10px; color: var(--text-dim); font-family: monospace; }
+        /* Shorter Dropdown Logic */
+        .user-details { 
+            background: rgba(0,0,0,0.1); 
+            padding: 12px; 
+            border-radius: 10px; 
+            margin-top: 10px; 
+            border: 1px solid var(--border); 
+            display: none; 
+            max-height: 200px; /* Reduced span */
+            overflow-y: auto; 
+            scrollbar-width: thin;
+        }
         
-        .status-active { color: var(--success); font-weight: bold; }
-        .status-revoked { color: var(--text-dim); }
+        .device-slot { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 6px; background: var(--bg); border-radius: 6px; border: 1px solid var(--border); }
+        .last-seen { font-size: 9px; color: var(--text-dim); font-family: monospace; }
+        .status-active { color: var(--success); font-weight: bold; font-size: 11px; }
+        .status-revoked { color: var(--text-dim); font-size: 11px; }
+        .saving-indicator { font-size: 9px; color: var(--success); display: none; margin-left: 8px; font-style: italic; }
     </style>
 </head>
 <body data-theme="dark">
     <div class="container">
         <div id="login-section" class="card" style="max-width:400px; margin: 100px auto; text-align: center;">
-            <h2>Admin Login</h2>
+            <h2>Admin Console</h2>
             <button class="primary" style="width: 100%;" onclick="login()">Sign in with Google</button>
         </div>
 
@@ -85,10 +74,10 @@
             <div class="card">
                 <h3>Create License</h3>
                 <div class="input-group">
-                    <input id="max_devices" type="number" value="1">
-                    <input id="days" type="number" value="30">
-                    <input id="user_email" type="text" placeholder="Initial User ID / Email">
-                    <button class="primary" onclick="create()">Generate</button>
+                    <input id="max_devices" type="number" placeholder="Max Devices" value="1">
+                    <input id="days" type="number" placeholder="Validity (Days)" value="30">
+                    <input id="user_email" type="text" placeholder="User ID / Email">
+                    <button class="primary" onclick="create()">Generate Key</button>
                 </div>
             </div>
 
@@ -115,11 +104,11 @@
     const SB_URL = "https://efhcunpogynphopqcqze.supabase.co";
     const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
     const _supabase = supabase.createClient(SB_URL, SB_KEY);
+    let saveTimeout = null;
 
     function toggleTheme() {
         const body = document.body;
-        const current = body.getAttribute('data-theme');
-        const next = current === 'dark' ? 'light' : 'dark';
+        const next = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
         body.setAttribute('data-theme', next);
         document.getElementById('theme-icon').innerText = next === 'dark' ? '☀️' : '🌙';
     }
@@ -140,16 +129,22 @@
         return { "Authorization": "Bearer " + session?.access_token, "Content-Type": "application/json" };
     }
 
-    async function updateNames(key, index) {
-        const inputs = document.querySelectorAll(`.name-input-${index}`);
-        const names = Array.from(inputs).map(i => i.value || i.placeholder);
-        const headers = await getHeaders();
-        await fetch(`/admin/licenses/${key}`, {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ assigned_users: names })
-        });
-        load();
+    function autoSave(key, index) {
+        if(saveTimeout) clearTimeout(saveTimeout);
+        const indicator = document.getElementById(`save-ind-${index}`);
+        if(indicator) indicator.style.display = "inline";
+        
+        saveTimeout = setTimeout(async () => {
+            const inputs = document.querySelectorAll(`.name-input-${index}`);
+            const names = Array.from(inputs).map(i => i.value || i.placeholder);
+            const headers = await getHeaders();
+            await fetch(`/admin/licenses/${key}`, {
+                method: 'PATCH',
+                headers,
+                body: JSON.stringify({ assigned_users: names })
+            });
+            if(indicator) indicator.style.display = "none";
+        }, 800);
     }
 
     async function load() {
@@ -163,42 +158,38 @@
             const used = lic.used_devices;
             const heading = (lic.assigned_users && lic.assigned_users[0]) || "Info";
             
-            let deviceHtml = "";
+            let deviceHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <span style="font-weight:bold; color:var(--accent); font-size:12px;">${used > 0 ? heading : 'New License'}</span>
+                                <span id="save-ind-${index}" class="saving-indicator">Saving...</span>
+                              </div>`;
+            
             if (used === 0) {
-                // Initial state
-                deviceHtml = `
-                    <div style="display:flex; gap:5px;">
-                        <input type="text" class="name-input-${index}" placeholder="Info" value="${lic.assigned_users[0] || ''}" style="width:100%; height:30px;">
-                        <button class="primary" onclick="updateNames('${lic.license_key}', ${index})" style="padding:0 10px;">Save</button>
-                    </div>`;
+                deviceHtml += `<input type="text" class="name-input-${index}" placeholder="Info" value="${lic.assigned_users[0] || ''}" oninput="autoSave('${lic.license_key}', ${index})" style="width:100%; border-radius:4px;">`;
             } else {
-                // Linked state
-                deviceHtml = `<div style="font-weight:bold; margin-bottom:10px; color:var(--accent);">${heading}</div>`;
                 for (let i = 0; i < used; i++) {
                     const name = lic.assigned_users[i] || `Client ${i+1}`;
                     const seen = lic.devices[i] ? new Date(lic.devices[i].last_seen).toLocaleString() : "Offline";
                     deviceHtml += `
                         <div class="device-slot">
-                            <input type="text" class="name-input-${index}" placeholder="Name&No" value="${name}" style="width:120px; height:25px; font-size:11px;">
+                            <input type="text" class="name-input-${index}" placeholder="Name&No" value="${name}" oninput="autoSave('${lic.license_key}', ${index})" style="width:110px; border:none; background:transparent; font-size:11px;">
                             <span class="last-seen">${seen}</span>
                         </div>`;
                 }
-                deviceHtml += `<button class="primary" onclick="updateNames('${lic.license_key}', ${index})" style="width:100%; margin-top:5px; height:30px; font-size:11px;">Update All</button>`;
             }
 
             tbody.innerHTML += `
                 <tr>
                     <td>
                         <span class="license-key">${lic.license_key}</span>
-                        <button class="user-btn" onclick="document.getElementById('details-${index}').style.display = document.getElementById('details-${index}').style.display === 'block' ? 'none' : 'block'">👤</button>
+                        <button class="user-btn" onclick="const d = document.getElementById('details-${index}'); d.style.display = d.style.display === 'block' ? 'none' : 'block'">👤</button>
                         <div id="details-${index}" class="user-details">${deviceHtml}</div>
                     </td>
-                    <td class="${lic.active ? 'status-active' : 'status-revoked'}">${lic.active ? '● ACTIVE' : '○ REVOKED'}</td>
-                    <td>${lic.max_devices - used} / ${lic.max_devices} Slots</td>
+                    <td class="${lic.active ? 'status-active' : 'status-revoked'}">${lic.active ? 'ACTIVE' : 'REVOKED'}</td>
+                    <td>${lic.max_devices - used} / ${lic.max_devices}</td>
                     <td>${new Date(lic.expires_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="secondary" onclick="toggleStatus('${lic.license_key}', ${lic.active})">Toggle</button>
-                        <button class="danger" onclick="deleteLic('${lic.license_key}')">Del</button>
+                        <button class="secondary" onclick="toggleStatus('${lic.license_key}', ${lic.active})" style="padding:4px 8px;">Status</button>
+                        <button class="danger" onclick="deleteLic('${lic.license_key}')" style="padding:4px 8px;">Delete</button>
                     </td>
                 </tr>`;
         });
@@ -219,13 +210,16 @@
 
     async function create() {
         const headers = await getHeaders();
+        const max = document.getElementById("max_devices").value;
+        const days = document.getElementById("days").value;
+        const user = document.getElementById("user_email").value;
         await fetch("/admin/licenses", {
             method: "POST",
             headers,
             body: JSON.stringify({
-                max_devices: parseInt(document.getElementById("max_devices").value),
-                days: parseInt(document.getElementById("days").value),
-                assigned_users: [document.getElementById("user_email").value]
+                max_devices: parseInt(max),
+                days: parseInt(days),
+                assigned_users: user ? [user] : []
             })
         });
         load();
