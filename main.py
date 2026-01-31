@@ -24,7 +24,7 @@ from admin_routes import router as admin_router
 load_dotenv()
 
 LICENSE_SECRET = os.getenv("LICENSE_SECRET")
-OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 24))
+OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 3))
 
 # Production Logging: Set to WARNING to keep logs clean
 logging.basicConfig(
