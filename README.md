@@ -86,3 +86,13 @@ Supabase	Google OAuth, token issuance, refresh
 FastAPI	Verify JWT via /auth/v1/user
 Database	Trusts FastAPI only
 
+## 🧩 Final Production Flow
+Admin opens /admin-ui
+Clicks Sign in with Google
+Supabase JS redirects → Google → back
+Supabase JS stores session
+Admin UI reads session.access_token
+API calls include:
+Authorization: Bearer <access_token>
+FastAPI verifies token via Supabase
+Admin routes unlock

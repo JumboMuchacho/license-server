@@ -1,61 +1,144 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>License Admin Console</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Admin Console</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #0f172a; color: #f8fafc; margin: 0; }
-        .container { max-width: 1100px; margin: auto; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #334155; }
-        input { background: #0f172a; border: 1px solid #475569; color: white; padding: 10px; margin: 5px; border-radius: 6px; width: 100%; max-width: 250px; box-sizing: border-box; }
-        button { padding: 10px 18px; cursor: pointer; border-radius: 6px; border: none; font-weight: bold; }
-        .primary { background: #22c55e; color: #052e16; }
-        .danger { background: #ef4444; color: white; }
-        .secondary { background: #475569; color: white; }
+        :root {
+            --bg: #0b0f1a;
+            --card-bg: #161c2d;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --border: #2d3748;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg); 
+            color: var(--text-main); 
+            margin: 0; 
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+
+        /* Card Styling */
+        .card { 
+            background: var(--card-bg); 
+            padding: 24px; 
+            border-radius: 16px; 
+            margin-bottom: 24px; 
+            border: 1px solid var(--border); 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Typography */
+        h2 { font-weight: 700; font-size: 1.5rem; margin-top: 0; letter-spacing: -0.025em; }
+        h3 { font-size: 1.1rem; color: var(--text-dim); margin-bottom: 20px; font-weight: 500; }
+
+        /* Inputs & Buttons */
+        .input-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 10px; }
+        
+        input { 
+            background: #0b0f1a; 
+            border: 1px solid var(--border); 
+            color: white; 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            font-size: 14px;
+            transition: border 0.2s;
+        }
+        input:focus { outline: none; border-color: var(--accent); }
+
+        button { 
+            padding: 12px 20px; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            border: none; 
+            font-weight: 600; 
+            font-size: 14px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .primary { background: var(--accent); color: white; }
+        .primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+        
+        .danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .danger:hover { background: var(--danger); color: white; }
+
+        .secondary { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+        .secondary:hover { border-color: var(--text-main); color: var(--text-main); }
+
         .hidden { display: none; }
-        .table-wrapper { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; min-width: 700px; }
-        th { text-align: left; background: #334155; padding: 12px; font-size: 13px; text-transform: uppercase; color: #94a3b8; }
-        td { padding: 12px; border-bottom: 1px solid #334155; font-size: 14px; }
-        .user-btn { background: #3b82f6; color: white; border-radius: 50%; width: 28px; height: 28px; border: none; cursor: pointer; font-size: 12px; margin-left: 8px; }
-        .user-details { background: #0f172a; padding: 8px; border-radius: 4px; margin-top: 5px; font-size: 11px; border: 1px solid #3b82f6; display: none; }
-        .status-active { color: #22c55e; font-weight: bold; }
-        .status-revoked { color: #64748b; }
-        .usage-badge { background: #334155; padding: 4px 8px; border-radius: 4px; font-family: monospace; }
+
+        /* Table Styling */
+        .table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; background: var(--card-bg); }
+        th { text-align: left; background: rgba(255,255,255,0.03); padding: 16px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+        td { padding: 16px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+        tr:last-child td { border: none; }
+
+        /* Components */
+        .license-key { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: #000; padding: 4px 8px; border-radius: 4px; color: #38bdf8; font-size: 13px; }
+        
+        .status-pill { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; display: inline-block; }
+        .status-active { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-revoked { background: rgba(148, 163, 184, 0.1); color: var(--text-dim); }
+
+        .usage-badge { color: var(--text-dim); font-size: 13px; }
+
+        .user-btn { background: rgba(99, 102, 241, 0.15); color: var(--accent); padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: 8px; border: 1px solid rgba(99, 102, 241, 0.2); }
+        .user-details { background: #000; padding: 12px; border-radius: 8px; margin-top: 10px; font-size: 12px; border-left: 3px solid var(--accent); display: none; color: var(--text-dim); }
+
+        /* Login Layout */
+        .login-card { max-width: 400px; margin: 100px auto; text-align: center; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="login-section" class="card" style="text-align: center;">
-            <h2>Admin Login</h2>
-            <button class="primary" onclick="login()">Login with Google</button>
+        <div id="login-section" class="card login-card">
+            <div style="font-size: 40px; margin-bottom: 10px;">🔐</div>
+            <h2>Admin Console</h2>
+            <p style="color: var(--text-dim); margin-bottom: 25px;">Sign in to manage your active licenses.</p>
+            <button class="primary" style="width: 100%;" onclick="login()">Login with Google</button>
         </div>
 
         <div id="admin-panel" class="hidden">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin:0;">License Manager</h2>
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="margin:0;">License Management</h2>
                 <button class="secondary" onclick="logout()">Logout</button>
-            </div>
+            </header>
 
             <div class="card">
-                <h3>Create License</h3>
-                <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                <h3>Generate New License</h3>
+                <div class="input-group">
                     <input id="max_devices" type="number" placeholder="Max Devices" value="1">
-                    <input id="days" type="number" placeholder="Days" value="30">
+                    <input id="days" type="number" placeholder="Validity (Days)" value="30">
                     <input id="user_email" type="text" placeholder="User ID / Email">
-                    <button class="primary" onclick="create()">Generate</button>
+                    <button class="primary" onclick="create()">Generate Key</button>
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card" style="padding: 0; overflow: hidden;">
                 <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
                                 <th>License Key</th>
                                 <th>Status</th>
-                                <th>Usage (Rem/Max)</th>
+                                <th>Usage</th>
                                 <th>Expires</th>
                                 <th>Actions</th>
                             </tr>
@@ -111,18 +194,28 @@
 
             const row = `<tr>
                 <td>
-                    <span style="font-family: monospace;">${lic.license_key}</span>
+                    <span class="license-key">${lic.license_key}</span>
                     <button class="user-btn" onclick="toggleUser(${index})">👤</button>
                     <div id="user-info-${index}" class="user-details">${userDisplay}</div>
                 </td>
-                <td class="${lic.active ? 'status-active' : 'status-revoked'}">${lic.active ? '● ACTIVE' : '○ REVOKED'}</td>
                 <td>
-                    <span class="usage-badge">${remaining} / ${lic.max_devices} Left</span>
+                    <span class="status-pill ${lic.active ? 'status-active' : 'status-revoked'}">
+                        ${lic.active ? 'Active' : 'Revoked'}
+                    </span>
+                </td>
+                <td>
+                    <span class="usage-badge"><b>${remaining}</b> of ${lic.max_devices} slots</span>
                 </td>
                 <td>${new Date(lic.expires_at).toLocaleDateString()}</td>
                 <td>
-                    <button onclick="toggleStatus('${lic.license_key}', ${lic.active})" style="background: #475569; font-size: 11px; padding: 6px 10px;">${lic.active ? 'Revoke' : 'Activate'}</button>
-                    <button class="danger" onclick="deleteLic('${lic.license_key}')" style="font-size: 11px; padding: 6px 10px;">Del</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="secondary" onclick="toggleStatus('${lic.license_key}', ${lic.active})" style="padding: 6px 12px; font-size: 11px;">
+                            ${lic.active ? 'Revoke' : 'Activate'}
+                        </button>
+                        <button class="danger" onclick="deleteLic('${lic.license_key}')" style="padding: 6px 12px; font-size: 11px;">
+                            Delete
+                        </button>
+                    </div>
                 </td>
             </tr>`;
             tbody.innerHTML += row;
