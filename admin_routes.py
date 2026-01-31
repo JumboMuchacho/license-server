@@ -1,4 +1,3 @@
-import os
 import uuid
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -10,7 +9,6 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/admin/licenses", tags=["Admin"])
 
-# --- SCHEMAS ---
 class LicenseUpdate(BaseModel):
     active: Optional[bool] = None
     assigned_users: Optional[List[str]] = None
@@ -20,13 +18,9 @@ class LicenseCreate(BaseModel):
     days: int = 30
     assigned_users: List[str] = []
 
-# --- HELPERS ---
 def generate_dashed_key():
-    """Generates a key in XXXX-XXXX-XXXX-XXXX format."""
     uid = uuid.uuid4().hex.upper()
     return f"{uid[:4]}-{uid[4:8]}-{uid[8:12]}-{uid[12:16]}"
-
-# --- ROUTES ---
 
 @router.get("")
 def get_all_licenses(db: Session = Depends(get_db)):
@@ -35,7 +29,6 @@ def get_all_licenses(db: Session = Depends(get_db)):
     for lic in licenses:
         device_list = sorted(lic.devices, key=lambda x: x.last_seen if x.last_seen else datetime.min)
         results.append({
-            "id": lic.id,
             "license_key": lic.license_key,
             "active": lic.active,
             "max_devices": lic.max_devices,
@@ -65,10 +58,7 @@ def create_license(payload: LicenseCreate, db: Session = Depends(get_db)):
 @router.patch("/{key}")
 def update_license(key: str, payload: LicenseUpdate, db: Session = Depends(get_db)):
     lic = db.query(License).filter(License.license_key == key).first()
-    if not lic:
-        raise HTTPException(status_code=404, detail="License not found")
-    if payload.active is not None:
-        lic.active = payload.active
+    if not lic: raise HTTPException(status_code=404)
     if payload.assigned_users is not None:
         lic.assigned_users = payload.assigned_users
     db.commit()

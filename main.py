@@ -1,14 +1,15 @@
 import os
 import time
-from datetime import datetime, timezone
 import logging
 import hmac
 import hashlib
 import json
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse, FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
@@ -23,10 +24,9 @@ from admin_routes import router as admin_router
 # ----------------------------
 load_dotenv()
 
-LICENSE_SECRET = os.getenv("LICENSE_SECRET")
+LICENSE_SECRET = os.getenv("LICENSE_SECRET", "change-me-in-production")
 OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 3))
 
-# Production Logging: Set to WARNING to keep logs clean
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -36,27 +36,29 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="License Server")
 
 # ----------------------------
-# 1. Health Checks (TOP PRIORITY)
+# 1. Routers & UI Redirects (Updates for Admin Panel)
 # ----------------------------
+
+# Include the Admin CRUD routes
+app.include_router(admin_router)
+
+# Handle the Supabase Redirect URL specifically
+@app.get("/admin-ui")
+async def admin_ui():
+    """Serves the main Admin HTML file."""
+    return FileResponse("static/admin/index.html")
+
+# Redirect root to /admin-ui instead of JSON message
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/admin-ui")
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-@app.get("/")
-def index():
-    return {"message": "License Server API is active"}
-
-# ----------------------------
-# 2. Routers & Static Files
-# ----------------------------
-app.include_router(admin_router)
-
-# Mount the Admin UI
-app.mount(
-    "/admin-ui",
-    StaticFiles(directory="static/admin", html=True),
-    name="admin-ui",
-)
+# Mount the entire static directory so CSS/JS files are accessible
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ----------------------------
 # Database Initialization
@@ -64,20 +66,16 @@ app.mount(
 @app.on_event("startup")
 def startup():
     models.Base.metadata.create_all(bind=engine)
-    # logger.warning used here so it shows up even in WARNING mode
     logger.warning("Database initialized and verified.")
 
 # ----------------------------
-# Schemas
+# Schemas & Helper
 # ----------------------------
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
     client_version: Optional[str] = None
 
-# ----------------------------
-# Helper: Signing
-# ----------------------------
 def sign_payload(payload: dict) -> str:
     raw = json.dumps(
         payload,
@@ -93,7 +91,7 @@ def sign_payload(payload: dict) -> str:
     ).hexdigest()
 
 # ----------------------------
-# 3. Verify Route (with Auto-Transfer)
+# 3. Verify Route (Keeping your original logic)
 # ----------------------------
 @app.post("/verify")
 def verify(req: VerifyRequest, db: Session = Depends(get_db)):
@@ -117,19 +115,14 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
     existing_device = db.query(models.Device).filter_by(device_id=req.device_id).first()
 
     if existing_device:
-        # CASE A: Device is already on THIS license
         if existing_device.license_id == lic.id:
             existing_device.last_seen = now
             db.commit()
         else:
-            # CASE B: Device is on a DIFFERENT license. Check if we can migrate.
             old_lic = db.query(models.License).filter_by(id=existing_device.license_id).first()
-            
-            # If old license is gone, revoked, or expired, allow the "jump"
             is_old_dead = not old_lic or not old_lic.active or (old_lic.expires_at and old_lic.expires_at < now)
             
             if is_old_dead:
-                # Check capacity on NEW license before moving
                 count = db.query(models.Device).filter_by(license_id=lic.id).count()
                 if count >= lic.max_devices:
                     raise HTTPException(status_code=429, detail="Target license is full")
@@ -139,10 +132,8 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
                 db.commit()
                 logger.warning(f"Device {req.device_id} migrated to license {lic.license_key}")
             else:
-                # Old license is still valid! Prevent theft.
                 raise HTTPException(status_code=403, detail="Device is still bound to another active license")
     else:
-        # CASE C: Completely new device binding
         count = db.query(models.Device).filter_by(license_id=lic.id).count()
         if count >= lic.max_devices:
             raise HTTPException(status_code=429, detail="Maximum device limit reached")
@@ -172,6 +163,5 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    # Default to 10000 for Render compatibility
-    port = int(os.getenv("PORT", 10000))
+    port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
