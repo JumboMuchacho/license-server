@@ -24,7 +24,9 @@ from admin_routes import router as admin_router
 # ----------------------------
 load_dotenv()
 
-LICENSE_SECRET = os.getenv("LICENSE_SECRET", "change-me-in-production")
+LICENSE_SECRET = os.getenv("LICENSE_SECRET") 
+if not LICENSE_SECRET:
+    raise ValueError("LICENSE_SECRET environment variable is not set!")
 OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 3))
 
 logging.basicConfig(
@@ -32,6 +34,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 app = FastAPI(title="License Server")
 
