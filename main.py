@@ -167,8 +167,8 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
 if __name__ == "__main__":
     import uvicorn
     # Automatically use 0.0.0.0 for Render, otherwise 127.0.0.1 for local dev
-    host = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"
+    host = "0.0.0.0" if os.environ.get("RENDER") else "127.0.0.1"   # nosec B104
     port = int(os.environ.get("PORT", 10000))
     
     # # nosec B104 tells Bandit this is intentional
-    uvicorn.run(app, host=host, port=port)  # nosec B104
+    uvicorn.run(app, host=host, port=port)  
