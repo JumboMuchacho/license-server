@@ -1,70 +1,114 @@
-# 🛡️ Professional Licensing Authority (Backend)
-A production-grade FastAPI backend designed for high-security software distribution. This system handles cryptographic license verification, multi-device orchestration, and administrative lifecycle management via a secure OAuth2/Supabase control plane.
+# 🛡️ Licensing Authority: Backend Control Plane
 
-# 🏗️ System Architecture
-The server acts as the central validation authority, utilizing a multi-layered security approach:
+![Security Scan](https://img.shields.io/badge/Security-Authenticated-red.svg)
+![FastAPI](https://img.shields.io/badge/Framework-FastAPI-009688.svg)
+![Supabase](https://img.shields.io/badge/Auth-Supabase-3ECF8E.svg)
 
-1. The Security Layer
-PBKDF2 Key Derivation: Instead of global secrets, the server derives per-device HMAC keys using 100,000 iterations of PBKDF2 with a unique salt.
+A production-grade **FastAPI** backend designed for high-security software entitlement. This system serves as the central authority for cryptographic license verification, multi-device orchestration, and administrative lifecycle management via a secure **Zero-Trust** control plane.
 
-HMAC-SHA256 Signing: Ensures all issued tokens are tamper-proof and cryptographically bound to the hardware ID.
 
-Identity Proxy: Administrative routes are secured via Supabase Service Role verification, ensuring only whitelisted emails can manage license data.
 
-2. The Logic Engine
-Sticky Device Binding: Automatically handles device registration and enforces strict max_devices limits.
+---
 
-Migration Logic: Intelligent handling for hardware upgrades; permits device migration only if the previous license association is dead/expired.
+## 🏗️ System Architecture
 
-Stateless Verification: Issues signed tokens for offline client resiliency while maintaining centralized revocation control.
+The server acts as the "Single Source of Truth," utilizing a multi-layered security approach to prevent unauthorized access and license spoofing.
 
-# 🔐 Production Auth Flow (Admin UI)
-The administration panel implements a modern Zero-Trust authentication flow:
+### 1. The Security Layer
+- **PBKDF2 Key Derivation:** To mitigate "Global Secret" vulnerabilities, the server derives unique, per-device HMAC keys using **100,000 iterations** of PBKDF2 with a unique cryptographic salt.
+- **HMAC-SHA256 Signing:** Ensures all issued tokens are tamper-proof and cryptographically bound to the client's hardware fingerprint.
+- **Identity Proxy:** Administrative routes are secured via **Supabase Service Role** verification, ensuring only whitelisted engineer emails can modify license data.
 
-Identity Provider: Admin logs in via Google OAuth through the Supabase JS client.
+### 2. The Logic Engine
+- **Sticky Device Binding:** Automatically handles registration and enforces strict `max_devices` concurrency limits.
+- **Migration Logic:** Features intelligent handling for hardware upgrades; permits device migration only if the previous license association is verified as inactive or expired.
+- **Stateless Verification:** Issues signed tokens for offline client resiliency while maintaining centralized revocation control.
 
-Token Exchange: The Admin UI captures the access_token and includes it in the Authorization: Bearer header.
+---
 
-FastAPI Middleware: The server proxies the token to Supabase’s /auth/v1/user endpoint.
+## 🔐 Production Auth Flow (Admin UI)
 
-Authorization: The server cross-references the authenticated email against a restricted ADMIN_EMAILS whitelist before granting access to CRUD operations.
+The administration panel implements a modern **Zero-Trust** authentication architecture:
 
-# 🛠️ API Reference
-Client Verification
-POST /verify
+1.  **Identity Provider:** Admin authenticates via **Google OAuth** through the Supabase JS client.
+2.  **Token Exchange:** The Admin UI captures the `access_token` and includes it in the `Authorization: Bearer` header for all API calls.
+3.  **FastAPI Middleware:** The server proxies the JWT to Supabase’s `/auth/v1/user` endpoint for real-time validation.
+4.  **Authorization:** The server cross-references the authenticated email against a restricted `ADMIN_EMAILS` whitelist before granting access to CRUD operations.
 
-Intent: Validates hardware and license status.
 
-Logic: Checks expiration, active status, and device limit.
 
-Response: Returns a signed payload containing an expiry timestamp (exp).
+---
 
-Admin Management (Internal)
-GET /admin/licenses — List all keys and connected device telemetry. POST /admin/licenses — Issue new dashed 16-character keys. DELETE /admin/licenses/{key} — Instant global revocation.
+## 📂 Project Structure
 
-# 📦 Deployment & Setup
-## Environment Configuration
-### Security
-LICENSE_SECRET=your_pbkdf2_derivation_secret
-TOKEN_TTL_HOURS=1
-
-### Database
-DATABASE_URL=postgresql://user:pass@host:port/db
-
-### Supabase Auth
-SUPABASE_URL=your_project_url
-SUPABASE_SERVICE_KEY=your_service_role_key
-ADMIN_EMAILS=admin@example.com,dev@example.com
-## Launching the Instance
-Bash
-Optimized for Render/Production
-uvicorn main:app --host 0.0.0.0 --port 10000
-## 🗂️ Project Structure
-Plaintext
+```text
+.
 ├── main.py            # API Gateway & Uvicorn entry point
-├── models.py          # SQLAlchemy relational schema
+├── models.py          # SQLAlchemy relational schema (Licenses/Devices)
 ├── security.py        # PBKDF2 & HMAC cryptographic functions
 ├── auth.py            # Supabase JWT & Whitelist middleware
 ├── admin_routes.py    # RESTful License CRUD logic
-├── database.py        # PostgreSQL/SQLite connection pooling
+├── database.py        # PostgreSQL connection pooling & session management
 └── static/admin       # Secure Admin UI (HTML/JS)
+
+```
+
+---
+
+## 🛠️ API Reference
+### Client Verification
+**`POST /verify`**
+
+* **Intent:** Validates hardware integrity and current license status.
+* **Logic:** Executes a server-side check of expiration dates, activation status, and device affinity (binding).
+* **Response:** Returns a cryptographically signed payload containing the session signature and an expiry timestamp (`exp`).
+
+---
+
+### Admin Management (Protected)
+*These endpoints require a valid Supabase JWT and admin whitelist clearance.*
+
+* **`GET /admin/licenses`** Retrieves a comprehensive list of all issued keys alongside real-time device telemetry and activation counts.
+    
+* **`POST /admin/licenses`** Generates and issues new 16-character dashed license keys with configurable Time-To-Live (TTL) and device limits.
+    
+* **`DELETE /admin/licenses/{key}`** Triggers immediate global revocation of entitlements for a specific key, instantly deauthorizing all associated devices.
+
+---
+
+## 📦 Deployment & Setup
+
+### Environment Configuration (`.env`)
+
+To ensure the system operates correctly, create a `.env` file in the root directory with the following variables:
+
+```env
+# Security
+LICENSE_SECRET=your_pbkdf2_derivation_secret
+TOKEN_TTL_HOURS=1
+
+# Database
+DATABASE_URL=postgresql://user:pass@host:port/db
+
+# Supabase Auth
+SUPABASE_URL=your_project_url
+SUPABASE_SERVICE_KEY=your_service_role_key
+ADMIN_EMAILS=admin@example.com,dev@example.com
+```
+
+---
+
+### 🚀Launching the Instance
+
+For local development or production VPS environments, use **Uvicorn** for a high-performance ASGI server:
+
+```bash
+# Optimized for Production (Render/VPS)
+uvicorn main:app --host 0.0.0.0 --port 10000
+---
+```
+
+## 📞 Support & Maintenance
+
+- **Lead Developer:** Job brian
+- **Status:** 🟢 Active Maintenance / Production Ready
