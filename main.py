@@ -27,7 +27,7 @@ load_dotenv()
 LICENSE_SECRET = os.getenv("LICENSE_SECRET") 
 if not LICENSE_SECRET:
     raise ValueError("LICENSE_SECRET environment variable is not set!")
-OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 3))
+OFFLINE_TTL_HOURS = int(os.getenv("TOKEN_TTL_HOURS", 1))
 
 logging.basicConfig(
     level=logging.WARNING,
