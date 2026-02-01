@@ -1,7 +1,7 @@
-🛡️ Professional Licensing Authority (Backend)
+# 🛡️ Professional Licensing Authority (Backend)
 A production-grade FastAPI backend designed for high-security software distribution. This system handles cryptographic license verification, multi-device orchestration, and administrative lifecycle management via a secure OAuth2/Supabase control plane.
 
-🏗️ System Architecture
+# 🏗️ System Architecture
 The server acts as the central validation authority, utilizing a multi-layered security approach:
 
 1. The Security Layer
@@ -18,7 +18,7 @@ Migration Logic: Intelligent handling for hardware upgrades; permits device migr
 
 Stateless Verification: Issues signed tokens for offline client resiliency while maintaining centralized revocation control.
 
-🔐 Production Auth Flow (Admin UI)
+# 🔐 Production Auth Flow (Admin UI)
 The administration panel implements a modern Zero-Trust authentication flow:
 
 Identity Provider: Admin logs in via Google OAuth through the Supabase JS client.
@@ -29,7 +29,7 @@ FastAPI Middleware: The server proxies the token to Supabase’s /auth/v1/user e
 
 Authorization: The server cross-references the authenticated email against a restricted ADMIN_EMAILS whitelist before granting access to CRUD operations.
 
-🛠️ API Reference
+# 🛠️ API Reference
 Client Verification
 POST /verify
 
@@ -42,25 +42,24 @@ Response: Returns a signed payload containing an expiry timestamp (exp).
 Admin Management (Internal)
 GET /admin/licenses — List all keys and connected device telemetry. POST /admin/licenses — Issue new dashed 16-character keys. DELETE /admin/licenses/{key} — Instant global revocation.
 
-📦 Deployment & Setup
-Environment Configuration
-Code snippet
-# Security
+# 📦 Deployment & Setup
+## Environment Configuration
+### Security
 LICENSE_SECRET=your_pbkdf2_derivation_secret
 TOKEN_TTL_HOURS=1
 
-# Database
+### Database
 DATABASE_URL=postgresql://user:pass@host:port/db
 
-# Supabase Auth
+### Supabase Auth
 SUPABASE_URL=your_project_url
 SUPABASE_SERVICE_KEY=your_service_role_key
 ADMIN_EMAILS=admin@example.com,dev@example.com
-Launching the Instance
+## Launching the Instance
 Bash
-# Optimized for Render/Production
+Optimized for Render/Production
 uvicorn main:app --host 0.0.0.0 --port 10000
-🗂️ Project Structure
+## 🗂️ Project Structure
 Plaintext
 ├── main.py            # API Gateway & Uvicorn entry point
 ├── models.py          # SQLAlchemy relational schema
