@@ -1,4 +1,4 @@
-# 🛡️ Licensing Authority: Backend Control Plane
+# 🛡️ License-server: Backend Control Plane
 
 ![Security Scan](https://img.shields.io/badge/Security-Authenticated-red.svg)
 ![FastAPI](https://img.shields.io/badge/Framework-FastAPI-009688.svg)
@@ -13,6 +13,11 @@ A production-grade **FastAPI** backend designed for high-security software entit
 ## 🏗️ System Architecture
 
 The server acts as the "Single Source of Truth," utilizing a multi-layered security approach to prevent unauthorized access and license spoofing.
+### Server responsibilities
+- License validation
+- Update manifest generation
+- Mandatory update enforcement
+- Admin UI toggles versions / uploads zips
 
 ### 1. The Security Layer
 - **PBKDF2 Key Derivation:** To mitigate "Global Secret" vulnerabilities, the server derives unique, per-device HMAC keys using **100,000 iterations** of PBKDF2 with a unique cryptographic salt.
@@ -70,7 +75,7 @@ The administration panel implements a modern **Zero-Trust** authentication archi
 
 * **`GET /admin/licenses`** Retrieves a comprehensive list of all issued keys alongside real-time device telemetry and activation counts.
     
-* **`POST /admin/licenses`** Generates and issues new 16-character dashed license keys with configurable Time-To-Live (TTL) and device limits.
+* **`POST /admin/licenses`** Generates and issues new 16-character dashed license keys with configurable device limits.
     
 * **`DELETE /admin/licenses/{key}`** Triggers immediate global revocation of entitlements for a specific key, instantly deauthorizing all associated devices.
 
@@ -85,7 +90,6 @@ To ensure the system operates correctly, create a `.env` file in the root direct
 ```env
 # Security
 LICENSE_SECRET=your_pbkdf2_derivation_secret
-TOKEN_TTL_HOURS=1
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:port/db

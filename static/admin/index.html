@@ -95,9 +95,13 @@
         document.getElementById('theme-icon').innerText = next === 'dark' ? '☀️' : '🌙';
     }
 
-    async function login() {
-        const target = window.location.origin + window.location.pathname;
-        await _supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: target } });
+async function login() {
+    // This MUST match the URL in your Supabase 'Allow List'
+    const target = "https://license-server-lewp.onrender.com/admin-ui";
+    await _supabase.auth.signInWithOAuth({ 
+        provider: 'google', 
+        options: { redirectTo: target } 
+    });
     }
 
     async function logout() { await _supabase.auth.signOut(); location.reload(); }
