@@ -55,7 +55,7 @@ class VerifyRequest(BaseModel):
 
 @app.post("/verify")
 def verify(req: VerifyRequest, db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()  # FIXED
 
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
@@ -63,10 +63,10 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
     ).first()
 
     if not lic:
-        raise HTTPException(status_code=404)
+        raise HTTPException(status_code=404, detail="License not found")
 
     if lic.expires_at and lic.expires_at < now:
-        raise HTTPException(status_code=410)
+        raise HTTPException(status_code=410, detail="License expired")
 
     device = db.query(models.Device).filter_by(
         license_id=lic.id,
@@ -74,8 +74,8 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
     ).first()
 
     if not device:
-        if len(lic.devices) >= lic.max_devices:
-            raise HTTPException(status_code=403)
+        if lic.max_devices is not None and len(lic.devices) >= lic.max_devices:
+            raise HTTPException(status_code=403, detail="Device limit reached")
 
         device = models.Device(
             license_id=lic.id,
@@ -88,15 +88,14 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
 
     db.commit()
 
-    # Token expiry = actual license expiry
     token = {
         "license": req.license_key,
         "device": req.device_id,
-        "exp": int(lic.expires_at.replace(tzinfo=timezone.utc).timestamp())
-        if lic.expires_at else None
+        "exp": int(time.time()) + 3600  # 1 hour token validity
     }
 
     return {
         "token": token,
-        "signature": sign_payload(token)
+        "signature": sign_payload(token),
+        "expires_at": lic.expires_at.isoformat() if lic.expires_at else None
     }
