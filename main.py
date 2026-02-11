@@ -55,7 +55,7 @@ class VerifyRequest(BaseModel):
 
 @app.post("/verify")
 def verify(req: VerifyRequest, db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
