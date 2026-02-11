@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
 
+
 class License(Base):
     __tablename__ = "licenses"
 
@@ -13,7 +14,11 @@ class License(Base):
     expires_at = Column(DateTime)
     assigned_users = Column(JSON, default=list)
 
-    devices = relationship("Device", back_populates="license", cascade="all,delete")
+    devices = relationship(
+        "Device",
+        back_populates="license",
+        cascade="all,delete"
+    )
 
 
 class Device(Base):
@@ -21,7 +26,7 @@ class Device(Base):
 
     id = Column(Integer, primary_key=True)
     license_id = Column(Integer, ForeignKey("licenses.id"))
-    device_id = Column(String, unique=True)
+    device_id = Column(String)  # removed unique=True
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     license = relationship("License", back_populates="devices")

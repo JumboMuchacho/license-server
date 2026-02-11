@@ -1,27 +1,12 @@
-import hmac
-import hashlib
 import json
-import os
-
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import UpdateManifest
+from security import verify_signature
 
 router = APIRouter(tags=["Updates"])
-
-LICENSE_SECRET = os.getenv("LICENSE_SECRET")
-if not LICENSE_SECRET:
-    raise RuntimeError("LICENSE_SECRET not configured")
-
-LICENSE_SECRET = LICENSE_SECRET.encode()
-
-
-def verify_sig(payload: dict, sig: str) -> bool:
-    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    expected = hmac.new(LICENSE_SECRET, raw, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, sig)
 
 
 @router.post("/update-manifest")
@@ -29,7 +14,7 @@ async def update_manifest(req: Request, db: Session = Depends(get_db)):
     body = await req.json()
     sig = req.headers.get("X-Signature")
 
-    if not sig or not verify_sig(body, sig):
+    if not sig or not verify_signature(body, sig):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
     manifest = (
