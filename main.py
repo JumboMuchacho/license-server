@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from database import engine, get_db
 import models
 from admin_routes import router as admin_router
-from updates_routes import router as updates_router
+from update_routes import router as updates_router
 from security import sign_payload
 
 load_dotenv()
@@ -55,7 +55,7 @@ class VerifyRequest(BaseModel):
 
 @app.post("/verify")
 def verify(req: VerifyRequest, db: Session = Depends(get_db)):
-    now = datetime.utcnow()  # FIXED
+    now = datetime.utcnow()
 
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
@@ -88,10 +88,20 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
 
     db.commit()
 
+    # -------------------------------------------------
+    # Token Lifetime Logic (UPDATED)
+    # -------------------------------------------------
+
+    if lic.expires_at:
+        exp_time = int(lic.expires_at.timestamp())
+    else:
+        # Lifetime license fallback → 7 day rolling token
+        exp_time = int(time.time()) + 604800
+
     token = {
         "license": req.license_key,
         "device": req.device_id,
-        "exp": int(time.time()) + 3600  # 1 hour token validity
+        "exp": exp_time
     }
 
     return {
