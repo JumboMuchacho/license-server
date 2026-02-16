@@ -446,15 +446,25 @@ showToast("License created");
 load();
 }
 
-async function checkUser(){
-const {data:{session}}=await _supabase.auth.getSession();
-if(session){
-document.getElementById("login-section").style.display="none";
-document.getElementById("admin-panel").style.display="block";
-load();
+async function initAuth() {
+  const { data: { session } } = await _supabase.auth.getSession();
+
+  if (session) {
+    document.getElementById("login-section").style.display = "none";
+    document.getElementById("admin-panel").style.display = "block";
+    load();
+  }
+
+  _supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      document.getElementById("login-section").style.display = "none";
+      document.getElementById("admin-panel").style.display = "block";
+      load();
+    }
+  });
 }
-}
-checkUser();
+
+initAuth();
 </script>
 
 </body>
