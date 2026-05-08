@@ -95,8 +95,8 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
     if lic.expires_at:
         exp_time = int(lic.expires_at.timestamp())
     else:
-        # Lifetime license fallback → 7 day rolling token
-        exp_time = int(time.time()) + 604800
+        # Lifetime license fallback → 5 mins
+        exp_time = int(time.time()) + 300
 
     token = {
         "license": req.license_key,
