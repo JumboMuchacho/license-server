@@ -96,7 +96,7 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
     if not lic:
         raise HTTPException(status_code=404, detail="License not found")
 
-    if lic.expires_at and lic.expires_at < now:
+    if lic.expires_at and lic.expires_at < now.replace(tzinfo=None):
         raise HTTPException(status_code=410, detail="License expired")
 
     device = db.query(models.Device).filter_by(
