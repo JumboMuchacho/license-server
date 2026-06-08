@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Request  # <--- Added Request
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from pydantic import BaseModel
@@ -31,6 +31,20 @@ app = FastAPI(title="License Server")
 # Set up SlowAPI state and custom exception handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# -------------------------------------------------
+# Gap C: Security Headers Middleware
+# -------------------------------------------------
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    # Allows loading local styles/scripts for your admin dashboard safely
+    response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline';"
+    return response
+
 
 app.include_router(admin_router)
 app.include_router(updates_router)
