@@ -137,7 +137,7 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
 
     return {
         "token": token,
-        "signature": sign_payload(token),
+        "signature": sign_payload(response_payload),
         "expires_at": f"{lic.expires_at.isoformat()}Z" if lic.expires_at else None
     }
 
