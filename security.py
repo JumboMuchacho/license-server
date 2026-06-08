@@ -69,8 +69,12 @@ def sign_payload(payload: dict) -> str:
 
 def verify_signature(payload: dict, signature: str) -> bool:
     """
-    Verify that a payload was signed correctly.
-    Mostly useful for internal checks or future endpoints.
+    Verify that the incoming payload signature matches the derived device secret.
     """
-    expected = sign_payload(payload)
-    return hmac.compare_digest(expected, signature)
+    if "device" not in payload:
+        return False
+    try:
+        expected_sig = sign_payload(payload)
+        return hmac.compare_digest(expected_sig, signature)
+    except Exception:
+        return False

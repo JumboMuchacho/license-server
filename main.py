@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from database import engine, get_db
 import models
 from admin_routes import router as admin_router
-from security import sign_payload
+from security import sign_payload, verify_signature
 
 load_dotenv()
 
@@ -40,8 +40,7 @@ async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    # Allows loading local styles/scripts for your admin dashboard safely
-    response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline';"
+    response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self' https://*.supabase.co;"
     return response
 
 
@@ -61,6 +60,7 @@ class VerifyRequest(BaseModel):
 class RulesRequest(BaseModel):
     license_key: str
     device_id: str
+    envelope: dict  # Receives the cryptographically structured packet from the client extension
 
 
 # -------------------------------------------------
@@ -145,24 +145,42 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
 # Limiting to 20 rules synchronization requests per minute per IP
 @app.post("/api/v1/rules")
 @limiter.limit("20/minute")
-def get_monitoring_rules(request: Request, req: RulesRequest, db: Session = Depends(get_db)):
+async def get_monitoring_rules(request: Request, req: RulesRequest, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
+    sig = request.headers.get("X-Signature")
 
-    # 1. Look up the license and ensure it is flagged active
+    # 1. Cryptographic client identity validation
+    if not sig or not verify_signature(req.envelope, sig):
+        raise HTTPException(status_code=403, detail="Invalid request signature")
+
+    # 2. Look up the license and ensure it is flagged active
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
         models.License.active == True
     ).first()
 
     # If license does not exist or has been administratively deactivated, return inactive state
-    if not lic:
+    if not lic or (lic.expires_at and lic.expires_at < now):
         return {"isActive": False, "rules": []}
 
-    # 2. Check expiration date
-    if lic.expires_at and lic.expires_at < now:
-        return {"isActive": False, "rules": []}
+    # 3. Synchronize Sticky Device telemetry bindings
+    device = db.query(models.Device).filter_by(
+        license_id=lic.id,
+        device_id=req.device_id
+    ).first()
 
-    # 3. If valid, serve the monitoring layout hooks safely from the cloud
+    if not device:
+        if lic.max_devices is not None and len(lic.devices) >= lic.max_devices:
+            return {"isActive": False, "rules": [], "detail": "Device limit reached"}
+
+        device = models.Device(license_id=lic.id, device_id=req.device_id, last_seen=now)
+        db.add(device)
+    else:
+        device.last_seen = now
+
+    db.commit()
+
+    # 4. Return layout targets dynamically
     return {
         "isActive": True,
         "rules": [
