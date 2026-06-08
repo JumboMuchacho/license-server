@@ -74,9 +74,9 @@ The administration panel implements a modern **Zero-Trust** authentication archi
 *These endpoints require a valid Supabase JWT and admin whitelist clearance.*
 
 * **`GET /admin/licenses`** Retrieves a comprehensive list of all issued keys alongside real-time device telemetry and activation counts.
-    
+
 * **`POST /admin/licenses`** Generates and issues new 16-character dashed license keys with configurable device limits.
-    
+
 * **`DELETE /admin/licenses/{key}`** Triggers immediate global revocation of entitlements for a specific key, instantly deauthorizing all associated devices.
 
 ---

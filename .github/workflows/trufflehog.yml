@@ -1,0 +1,24 @@
+name: Secret Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  trufflehog-scan:
+    name: TruffleHog Secret Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Crucial: TruffleHog needs the entire git history to verify past commits
+
+      - name: TruffleHog OSS Scan
+        uses: trufflesecurity/trufflehog-enterprise-action@main
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified

@@ -22,7 +22,7 @@ Base = declarative_base()
 # --- ADD THIS PART BELOW ---
 def get_db():
     """
-    Creates a new database session for a request and 
+    Creates a new database session for a request and
     closes it once the request is finished.
     """
     db = SessionLocal()
