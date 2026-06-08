@@ -86,7 +86,8 @@ def health():
 @app.post("/verify")
 @limiter.limit("5/minute")
 def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+    # Use standard naive UTC datetime to seamlessly match your PostgreSQL schema definitions
+    now = datetime.utcnow()
 
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
@@ -96,7 +97,7 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
     if not lic:
         raise HTTPException(status_code=404, detail="License not found")
 
-    if lic.expires_at and lic.expires_at < now.replace(tzinfo=None):
+    if lic.expires_at and lic.expires_at < now:
         raise HTTPException(status_code=410, detail="License expired")
 
     device = db.query(models.Device).filter_by(
@@ -120,11 +121,12 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
     db.commit()
 
     # -------------------------------------------------
-    # Token Lifetime Logic (UPDATED)
+    # Token Lifetime Logic
     # -------------------------------------------------
 
     if lic.expires_at:
-        exp_time = int(lic.expires_at.timestamp())
+        # Use calendar timegm to extract epoch seconds safely from naive database datetime
+        exp_time = int(calendar.timegm(lic.expires_at.utctimetuple()))
     else:
         # Lifetime license fallback → 5 mins
         exp_time = int(time.time()) + 300
@@ -133,6 +135,12 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
         "license": req.license_key,
         "device": req.device_id,
         "exp": exp_time
+    }
+
+    # FIX: Define the payload structure before passing it to the cryptographic signer
+    response_payload = {
+        "token": token,
+        "device": req.device_id
     }
 
     return {
