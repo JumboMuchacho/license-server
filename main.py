@@ -3,12 +3,17 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request  # <--- Added Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+
+# --- SlowAPI Imports ---
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from database import engine, get_db
 import models
@@ -18,7 +23,14 @@ from security import sign_payload
 
 load_dotenv()
 
+# Initialize the Limiter using the client's remote IP address
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="License Server")
+
+# Set up SlowAPI state and custom exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(admin_router)
 app.include_router(updates_router)
@@ -58,9 +70,11 @@ def health():
     return {"status": "ok"}
 
 
+# Limiting to 5 attempts per minute per IP to prevent brute-forcing keys
 @app.post("/verify")
-def verify(req: VerifyRequest, db: Session = Depends(get_db)):
-    now = datetime.utcnow()
+@limiter.limit("5/minute")
+def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
 
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
@@ -116,9 +130,11 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db)):
     }
 
 
+# Limiting to 20 rules synchronization requests per minute per IP
 @app.post("/api/v1/rules")
-def get_monitoring_rules(req: RulesRequest, db: Session = Depends(get_db)):
-    now = datetime.utcnow()
+@limiter.limit("20/minute")
+def get_monitoring_rules(request: Request, req: RulesRequest, db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
 
     # 1. Look up the license and ensure it is flagged active
     lic = db.query(models.License).filter(
