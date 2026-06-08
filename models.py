@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
 
-
 class License(Base):
     __tablename__ = "licenses"
 
@@ -20,13 +19,16 @@ class License(Base):
         cascade="all,delete"
     )
 
-
 class Device(Base):
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True)
     license_id = Column(Integer, ForeignKey("licenses.id"))
-    device_id = Column(String)  # removed unique=True
+    device_id = Column(String)
+
+    # NEW FIELD: This secret is generated upon activation and shared with the extension
+    shared_secret = Column(String, nullable=True)
+
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     license = relationship("License", back_populates="devices")

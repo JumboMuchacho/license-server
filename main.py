@@ -1,127 +1,91 @@
-import calendar
-from datetime import datetime, timezone
 import os
-import time
+import hmac
+import hashlib
+import json
+import secrets
+from datetime import datetime, timezone
 from typing import Optional
-
-from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, Header
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
-
-from admin_routes import router as admin_router
 from database import engine, get_db
 import models
-from security import sign_payload, verify_signature, derive_device_secret
-
-load_dotenv()
-
-# Initialize the Limiter using the client's remote IP address
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="License Server")
 
-# Set up SlowAPI state and custom exception handler
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-
 # -------------------------------------------------
-# Security Headers Middleware
+# Schemas
 # -------------------------------------------------
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self' 'unsafe-inline' https://unpkg.com; connect-src 'self' https://*.supabase.co;"
-    )
-    return response
-
-
-app.include_router(admin_router)
-
-
-# -------------------------------------------------
-# Pydantic Schemas
-# -------------------------------------------------
-
 class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
-    version: Optional[str] = None
 
+# -------------------------------------------------
+# Helper: Verify Token
+# -------------------------------------------------
+def verify_token(device_id: str, timestamp: str, token: str, db: Session):
+    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    if not device or not device.shared_secret:
+        return False
 
-class RulesRequest(BaseModel):
-    license_key: str
-    device_id: str
-    envelope: dict  # Receives the cryptographically structured packet from the client extension
+    # HMAC of the timestamp using the stored shared_secret
+    expected = hmac.new(
+        device.shared_secret.encode(),
+        timestamp.encode(),
+        hashlib.sha256
+    ).hexdigest()
 
+    return hmac.compare_digest(expected, token)
 
 # -------------------------------------------------
 # Routes
 # -------------------------------------------------
 
-@app.get("/")
-def root():
-    return RedirectResponse("/admin-ui")
-
-
-@app.get("/admin-ui")
-def admin_ui():
-    return FileResponse("static/admin/index.html")
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-@app.post("/api/v1/rules")
-def get_secure_rules(request: Request, body: dict, db: Session = Depends(get_db)):
-    # 1. Extract the exact keys sent by background.js (license_key, device_id, envelope)
-    license_key = body.get("license_key")
-    device_id = body.get("device_id")
-    envelope = body.get("envelope")
-    incoming_signature = request.headers.get("X-Signature")
-
-    if not license_key or not device_id or not envelope or not incoming_signature:
-        raise HTTPException(status_code=400, detail="Missing required payload parameters")
-
-    # 2. Database validation
-    lic = db.query(models.License).filter(models.License.license_key == license_key, models.License.active == True).first()
+@app.post("/api/v1/register")
+def register_device(request: VerifyRequest, db: Session = Depends(get_db)):
+    # 1. Find the license
+    lic = db.query(models.License).filter(models.License.license_key == request.license_key, models.License.active == True).first()
     if not lic:
         raise HTTPException(status_code=403, detail="Invalid license")
 
-    device = db.query(models.Device).filter(models.Device.license_id == lic.id, models.Device.device_id == device_id).first()
+    # 2. Find or create the device
+    device = db.query(models.Device).filter(models.Device.device_id == request.device_id).first()
+
     if not device:
-        raise HTTPException(status_code=403, detail="Device not registered")
+        # Create new device with a fresh shared_secret
+        new_secret = secrets.token_hex(16)
+        device = models.Device(
+            license_id=lic.id,
+            device_id=request.device_id,
+            shared_secret=new_secret
+        )
+        db.add(device)
+        db.commit()
+        db.refresh(device)
 
-    # 3. CRITICAL: Match JavaScript's JSON.stringify() behavior exactly.
-    # JavaScript's JSON.stringify() sorts keys and removes spaces.
-    # Python's json.dumps() must use separators=(',', ':') and sort_keys=True
-    serialized_envelope = json.dumps(envelope, separators=(',', ':'), sort_keys=True)
+    # Return the secret so the extension can store it
+    return {"status": "success", "shared_secret": device.shared_secret}
 
-    # 4. Cryptographically verify using the derived secret
-    derived_secret_bytes = derive_device_secret(device_id)
+@app.post("/api/v1/rules")
+def get_secure_rules(
+    request: Request,
+    body: dict,
+    x_auth_token: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    device_id = body.get("device_id")
+    timestamp = body.get("timestamp")
 
-    # Compute HMAC-SHA256
-    computed_hash = hmac.new(
-        derived_secret_bytes,
-        serialized_envelope.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+    if not device_id or not timestamp or not x_auth_token:
+        raise HTTPException(status_code=400, detail="Missing auth parameters")
 
-    # 5. Compare signatures
-    if not hmac.compare_digest(computed_hash, incoming_signature):
-        raise HTTPException(status_code=403, detail="Cryptographic signature mismatch")
+    if not verify_token(device_id, str(timestamp), x_auth_token, db):
+        raise HTTPException(status_code=403, detail="Invalid auth token")
 
-    # Success: update and return rules
+    # Success: update last_seen
+    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     device.last_seen = datetime.now(timezone.utc)
     db.commit()
 
@@ -133,12 +97,7 @@ def get_secure_rules(request: Request, body: dict, db: Session = Depends(get_db)
         ]
     }
 
-# -------------------------------------------------
-# Static Files & Lifecycle
-# -------------------------------------------------
-
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 
 @app.on_event("startup")
 def startup():
