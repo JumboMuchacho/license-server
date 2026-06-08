@@ -34,7 +34,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # -------------------------------------------------
-# Gap C: Security Headers Middleware
+# Security Headers Middleware
 # -------------------------------------------------
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -138,7 +138,7 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
         "exp": exp_time
     }
 
-    # FIX: Define the payload structure before passing it to the cryptographic signer
+    # Define the payload structure before passing it to the cryptographic signer
     response_payload = {
         "token": token,
         "device": req.device_id
@@ -154,42 +154,48 @@ def verify(request: Request, req: VerifyRequest, db: Session = Depends(get_db)):
 # Limiting to 20 rules synchronization requests per minute per IP
 @app.post("/api/v1/rules")
 @limiter.limit("20/minute")
-async def get_monitoring_rules(request: Request, req: RulesRequest, db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
+async def get_secure_rules(request: Request, req: RulesRequest, db: Session = Depends(get_db)):
+    now = datetime.utcnow()
     sig = request.headers.get("X-Signature")
 
     # 1. Cryptographic client identity validation
     if not sig or not verify_signature(req.envelope, sig):
         raise HTTPException(status_code=403, detail="Invalid request signature")
 
-    # 2. Look up the license and ensure it is flagged active
+    # 2. Validate the license status in your database
     lic = db.query(models.License).filter(
         models.License.license_key == req.license_key,
         models.License.active == True
     ).first()
 
-    # If license does not exist or has been administratively deactivated, return inactive state
+    # If license doesn't exist or is expired, return an empty rules array safely
     if not lic or (lic.expires_at and lic.expires_at < now):
         return {"isActive": False, "rules": []}
 
-    # 3. Synchronize Sticky Device telemetry bindings
-    device = db.query(models.Device).filter_by(
+    # 3. Verify the device is actually registered to this specific license key
+    device_authorized = db.query(models.Device).filter_by(
         license_id=lic.id,
         device_id=req.device_id
     ).first()
 
-    if not device:
+    if not device_authorized:
+        # Auto-register device if limit headroom is available
         if lic.max_devices is not None and len(lic.devices) >= lic.max_devices:
-            return {"isActive": False, "rules": [], "detail": "Device limit reached"}
+            return {"isActive": False, "rules": []}
 
-        device = models.Device(license_id=lic.id, device_id=req.device_id, last_seen=now)
-        db.add(device)
+        device_authorized = models.Device(
+            license_id=lic.id,
+            device_id=req.device_id,
+            last_seen=now
+        )
+        db.add(device_authorized)
     else:
-        device.last_seen = now
+        # Update device telemetry heartbeat
+        device_authorized.last_seen = now
 
     db.commit()
 
-    # 4. Return layout targets dynamically
+    # 4. SUCCESS: Return the secure layout selectors hidden from public repositories
     return {
         "isActive": True,
         "rules": [
