@@ -30,14 +30,3 @@ class Device(Base):
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     license = relationship("License", back_populates="devices")
-
-
-class UpdateManifest(Base):
-    __tablename__ = "update_manifest"
-
-    latest_version = Column(String, nullable=False, primary_key=True)
-    min_required_version = Column(String, nullable=False)
-    url = Column(String, nullable=False)
-    sha256 = Column(String, nullable=False)
-    mandatory = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=datetime.utcnow)

@@ -18,7 +18,6 @@ from slowapi.errors import RateLimitExceeded
 from database import engine, get_db
 import models
 from admin_routes import router as admin_router
-from update_routes import router as updates_router
 from security import sign_payload
 
 load_dotenv()
@@ -47,7 +46,6 @@ async def add_security_headers(request: Request, call_next):
 
 
 app.include_router(admin_router)
-app.include_router(updates_router)
 
 
 # -------------------------------------------------
