@@ -2,6 +2,7 @@ import os
 import time
 from datetime import datetime, timezone
 from typing import Optional
+from billing_routes import router as billing_router
 
 from fastapi import FastAPI, HTTPException, Depends, Request, Header
 from fastapi.staticfiles import StaticFiles
@@ -33,6 +34,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include Admin Control Routes
 app.include_router(admin_router)
+app.include_router(billing_router)
 
 # Mount UI Asset Directory safely if it exists
 if os.path.exists("static"):
