@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from database import engine, get_db
 import models
 from admin_routes import router as admin_router
-from security import verify_signature, sign_payload
+from security import verify_raw_signature, sign_payload
 
 load_dotenv()
 
@@ -187,7 +187,7 @@ def consume_token(
     and returns a cryptographically signed authorization packet to fire the alarm.
     """
     # 1. Verify incoming request signature to prevent spoofing
-    if not verify_signature(body.device_id, body.timestamp, x_auth_token):
+    if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
     # 2. Find device and its bound license context
