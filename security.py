@@ -64,26 +64,17 @@ def sign_payload(payload: dict) -> str:
 
 
 # -------------------------------------------------
-# Signature verification (server-side rules endpoint)
+# Signature verification (server-side optional use)
 # -------------------------------------------------
 
-def verify_signature(envelope: dict, client_signature: str, derived_secret: bytes) -> bool:
+def verify_signature(payload: dict, signature: str) -> bool:
     """
     Verify that the incoming payload signature matches the derived device secret.
-    Minimizes and sorts dictionary keys exactly like JavaScript's JSON.stringify().
     """
+    if "device" not in payload:
+        return False
     try:
-        # 1. Canonical JSON representation matching extension's JSON.stringify()
-        serialized_envelope = json.dumps(envelope, separators=(',', ':'), sort_keys=True)
-
-        # 2. Compute the HMAC-SHA256 signature using the derived secret
-        computed_hash = hmac.new(
-            derived_secret,
-            serialized_envelope.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
-
-        # 3. Securely compare strings to prevent timing attacks
-        return hmac.compare_digest(computed_hash, client_signature)
+        expected_sig = sign_payload(payload)
+        return hmac.compare_digest(expected_sig, signature)
     except Exception:
         return False
