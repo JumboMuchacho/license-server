@@ -27,12 +27,15 @@ def get_all_licenses(db: Session = Depends(get_db)):
     licenses = db.query(License).all()
     results = []
     for lic in licenses:
+        # Sort devices by last_seen
         device_list = sorted(lic.devices, key=lambda x: x.last_seen if x.last_seen else datetime.min)
+
         results.append({
             "license_key": lic.license_key,
             "active": lic.active,
             "max_devices": lic.max_devices,
             "used_devices": len(lic.devices),
+            "token_balance": lic.token_balance,  # Integrated successfully
             "expires_at": lic.expires_at.isoformat() if lic.expires_at else None,
             "assigned_users": lic.assigned_users or [],
             "devices": [{"last_seen": d.last_seen.isoformat() if d.last_seen else None} for d in device_list]
@@ -48,6 +51,7 @@ def create_license(payload: LicenseCreate, db: Session = Depends(get_db)):
         max_devices=payload.max_devices,
         expires_at=expiry,
         assigned_users=payload.assigned_users,
+        token_balance=0, # Initialize new licenses with 0 tokens
         active=True
     )
     db.add(new_lic)

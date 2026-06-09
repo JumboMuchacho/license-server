@@ -169,62 +169,6 @@ vertical-align:top;
 font-size:13px;
 }
 
-.status{
-padding:5px 10px;
-border-radius:999px;
-font-size:11px;
-font-weight:600;
-}
-
-.status.active{
-background:rgba(16,185,129,.15);
-color:var(--success);
-}
-
-.status.inactive{
-background:rgba(148,163,184,.15);
-color:var(--muted);
-}
-
-.license-key{
-font-family:monospace;
-font-weight:700;
-color:var(--accent);
-}
-
-/* Device Panel */
-.device-panel{
-margin-top:10px;
-background:var(--panel);
-border:1px solid var(--border);
-border-radius:12px;
-padding:12px;
-display:none;
-}
-
-.device-row{
-display:flex;
-justify-content:space-between;
-align-items:center;
-padding:6px 0;
-gap:10px;
-font-size:12px;
-}
-
-.device-row input{
-background:transparent;
-border:none;
-color:inherit;
-padding:4px;
-font-size:12px;
-}
-
-.last-seen{
-font-size:10px;
-color:var(--muted);
-font-family:monospace;
-}
-
 /* Toast */
 .toast{
 position:fixed;
@@ -244,14 +188,6 @@ transition:.3s;
 opacity:1;
 transform:translateY(0);
 }
-
-/* Mobile */
-@media(max-width:768px){
-.header{
-flex-direction:column;
-align-items:flex-start;
-}
-}
 </style>
 </head>
 
@@ -259,13 +195,11 @@ align-items:flex-start;
 
 <div class="container">
 
-<!-- LOGIN -->
 <div id="login-section" class="card" style="max-width:400px;margin:120px auto;text-align:center;">
 <h2 style="margin-top:0;">Admin Access</h2>
 <button class="primary" style="width:100%;" onclick="login()">Continue with Google</button>
 </div>
 
-<!-- PANEL -->
 <div id="admin-panel" style="display:none;">
 
 <div class="header">
@@ -276,7 +210,6 @@ align-items:flex-start;
 </div>
 </div>
 
-<!-- CREATE -->
 <div class="card">
 <h3 style="margin-top:0;">Create New License</h3>
 <div class="input-grid">
@@ -287,7 +220,6 @@ align-items:flex-start;
 </div>
 </div>
 
-<!-- TABLE -->
 <div class="card table-wrapper">
 <table>
 <thead>
@@ -295,11 +227,12 @@ align-items:flex-start;
 <th>License</th>
 <th>Status</th>
 <th>Usage</th>
+<th>Tokens</th>
 <th>Expiry</th>
 <th>Actions</th>
 </tr>
 </thead>
-<tbody id="tbody"></tbody>
+<tbody id="licenses-tbody"></tbody>
 </table>
 </div>
 
@@ -322,15 +255,11 @@ setTimeout(()=>t.classList.remove("show"),2500);
 
 function toggleTheme(){
 const b=document.body;
-b.setAttribute("data-theme",
-b.getAttribute("data-theme")==="dark"?"light":"dark");
+b.setAttribute("data-theme", b.getAttribute("data-theme")==="dark"?"light":"dark");
 }
 
 async function login(){
-await _supabase.auth.signInWithOAuth({
-provider:"google",
-options:{redirectTo:window.location.href}
-});
+await _supabase.auth.signInWithOAuth({ provider:"google", options:{redirectTo:window.location.href} });
 }
 
 async function logout(){
@@ -340,121 +269,81 @@ location.reload();
 
 async function getHeaders(){
 const {data:{session}}=await _supabase.auth.getSession();
-return{
-Authorization:`Bearer ${session?.access_token}`,
-"Content-Type":"application/json"
-};
+return{ Authorization:`Bearer ${session?.access_token}`, "Content-Type":"application/json" };
 }
 
-async function copyKey(k){
-await navigator.clipboard.writeText(k);
-showToast("License copied");
+function render(data) {
+  const tbody = document.getElementById("licenses-tbody");
+  tbody.innerHTML = data.map(l => {
+    const exp = l.expires_at ? new Date(l.expires_at).toLocaleDateString() : 'Never';
+    return `
+      <tr class="border-b border-gray-800 hover:bg-slate-800/50 transition">
+        <td class="p-4 font-mono text-sm font-semibold text-indigo-400">${l.license_key}</td>
+        <td class="p-4">
+          <span class="px-2 py-1 rounded text-xs font-bold ${l.active ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">
+            ${l.active ? 'Active' : 'Revoked'}
+          </span>
+        </td>
+        <td class="p-4 text-sm text-slate-300">
+          ${l.used_devices} / ${l.max_devices} <span class="text-xs text-slate-500">devices</span>
+        </td>
+        <td class="p-4 text-sm font-semibold text-amber-400">
+          ${l.token_balance || 0} <span class="text-xs text-slate-500 font-normal">tokens</span>
+        </td>
+        <td class="p-4 text-sm text-slate-400">${exp}</td>
+        <td class="p-4 flex gap-2">
+          <button onclick="toggleStatus('${l.license_key}', ${l.active})" class="px-3 py-1 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 transition">
+            ${l.active ? 'Revoke' : 'Reactivate'}
+          </button>
+          <button onclick="deleteLic('${l.license_key}')" class="px-3 py-1 text-xs font-medium rounded bg-rose-950/40 text-rose-400 border border-rose-900/50 hover:bg-rose-900/60 transition">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function load(){
-const r=await fetch("/admin/licenses",{headers:await getHeaders()});
-const data=await r.json();
-const tbody=document.getElementById("tbody");
-tbody.innerHTML="";
-
-data.forEach((lic,idx)=>{
-let row=`
-<tr>
-<td>
-<span class="license-key">${lic.license_key}</span>
-<button class="secondary" style="margin-left:8px;" onclick="copyKey('${lic.license_key}')">Copy</button>
-<button class="secondary" style="margin-left:6px;" onclick="toggleDetails(${idx})">Devices</button>
-<div id="dev-${idx}" class="device-panel">
-${lic.devices.map((d,i)=>`
-<div class="device-row">
-<input value="${lic.assigned_users[i]||'Device '+(i+1)}"
-onchange="saveUser('${lic.license_key}',${idx})">
-<span class="last-seen">${new Date(d.last_seen).toLocaleString()}</span>
-</div>
-`).join("")}
-</div>
-</td>
-
-<td>
-<span class="status ${lic.active?'active':'inactive'}">
-${lic.active?'ACTIVE':'INACTIVE'}
-</span>
-</td>
-
-<td>${lic.used_devices}/${lic.max_devices}</td>
-
-<td>${new Date(lic.expires_at).toLocaleDateString()}</td>
-
-<td>
-<button class="secondary"
-onclick="toggleStatus('${lic.license_key}',${lic.active})">
-${lic.active?'Revoke':'Reactivate'}
-</button>
-<button class="danger"
-onclick="deleteLic('${lic.license_key}')">Delete</button>
-</td>
-</tr>
-`;
-tbody.innerHTML+=row;
-});
-}
-
-function toggleDetails(i){
-const d=document.getElementById(`dev-${i}`);
-d.style.display=d.style.display==="block"?"none":"block";
-}
-
-async function saveUser(k,idx){
-const inputs=document.querySelectorAll(`#dev-${idx} input`);
-const names=Array.from(inputs).map(i=>i.value);
-await fetch(`/admin/licenses/${k}`,{
-method:"PATCH",
-headers:await getHeaders(),
-body:JSON.stringify({assigned_users:names})
-});
-showToast("Saved");
+  const r=await fetch("/admin/licenses",{headers:await getHeaders()});
+  const data=await r.json();
+  render(data);
 }
 
 async function toggleStatus(k,active){
-await fetch(`/admin/licenses/${k}/${active?'revoke':'reactivate'}`,
-{method:"POST",headers:await getHeaders()});
-load();
+  await fetch(`/admin/licenses/${k}/${active?'revoke':'reactivate'}`, {method:"POST",headers:await getHeaders()});
+  load();
 }
 
 async function deleteLic(k){
-if(confirm("Delete license permanently?")){
-await fetch(`/admin/licenses/${k}`,{
-method:"DELETE",headers:await getHeaders()
-});
-showToast("Deleted");
-load();
-}
+  if(confirm("Delete license permanently?")){
+    await fetch(`/admin/licenses/${k}`,{ method:"DELETE",headers:await getHeaders() });
+    showToast("Deleted");
+    load();
+  }
 }
 
 async function create(){
-await fetch("/admin/licenses",{
-method:"POST",
-headers:await getHeaders(),
-body:JSON.stringify({
-max_devices:parseInt(document.getElementById("max_devices").value),
-days:parseInt(document.getElementById("days").value),
-assigned_users:document.getElementById("user_email").value?
-[document.getElementById("user_email").value]:[]
-})
-});
-showToast("License created");
-load();
+  await fetch("/admin/licenses",{
+    method:"POST",
+    headers:await getHeaders(),
+    body:JSON.stringify({
+      max_devices:parseInt(document.getElementById("max_devices").value),
+      days:parseInt(document.getElementById("days").value),
+      assigned_users:document.getElementById("user_email").value ? [document.getElementById("user_email").value] : []
+    })
+  });
+  showToast("License created");
+  load();
 }
 
 async function initAuth() {
   const { data: { session } } = await _supabase.auth.getSession();
-
   if (session) {
     document.getElementById("login-section").style.display = "none";
     document.getElementById("admin-panel").style.display = "block";
     load();
   }
-
   _supabase.auth.onAuthStateChange((event, session) => {
     if (session) {
       document.getElementById("login-section").style.display = "none";
@@ -466,6 +355,5 @@ async function initAuth() {
 
 initAuth();
 </script>
-
 </body>
 </html>
