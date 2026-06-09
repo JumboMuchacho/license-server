@@ -13,6 +13,7 @@ class License(Base):
     max_devices = Column(Integer, default=1)
     expires_at = Column(DateTime)
     assigned_users = Column(JSON, default=list)
+    token_balance = Column(Integer, default=0)  # <-- Added token balance tracking
 
     devices = relationship(
         "Device",
