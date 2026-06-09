@@ -18,7 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from database import engine, get_db
 import models
 from admin_routes import router as admin_router
-from security import verify_raw_signature
+from security import verify_raw_signature, sign_payload
 
 load_dotenv()
 
@@ -55,6 +55,11 @@ class VerifyRequest(BaseModel):
     license_key: str
     device_id: str
     version: Optional[str] = None
+
+
+class ConsumeTokenRequest(BaseModel):
+    device_id: str
+    timestamp: int
 
 # -------------------------------------------------
 # Operational Routes
@@ -166,4 +171,56 @@ def get_secure_rules(
             "//div[contains(@class,'commonModal-wrap')]//div[contains(@class,'message') and contains(.,'no USDT transaction')]",
             "//div[contains(@class,'commonModal-wrap')]//div[contains(@class,'buttonBox')]//div[contains(.,'Try Again Later')]"
         ]
+    }
+
+
+@app.post("/api/v1/billing/consume-token")
+@limiter.limit("30/minute")
+def consume_token(
+    request: Request,
+    body: ConsumeTokenRequest,
+    x_auth_token: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Deducts 1 token from the license balance on successful element match,
+    and returns a cryptographically signed authorization packet to fire the alarm.
+    """
+    # 1. Verify incoming request signature to prevent spoofing
+    if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
+        raise HTTPException(status_code=403, detail="Invalid request signature.")
+
+    # 2. Find device and its bound license context
+    device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+    if not device or not device.license:
+        raise HTTPException(status_code=404, detail="Device registration profile not found.")
+
+    lic = device.license
+    if not lic.active:
+        raise HTTPException(status_code=403, detail="License has been suspended.")
+
+    # 3. Check token balance status
+    if lic.token_balance <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient token balance. Please top up via M-Pesa.")
+
+    # 4. Deduct token and commit transaction securely
+    lic.token_balance -= 1
+    device.last_seen = datetime.now(timezone.utc)
+    db.commit()
+
+    # 5. Build confirmation payload and sign it using our system signature architecture
+    auth_timestamp = int(time.time())
+
+    payload_to_sign = {
+        "device": body.device_id,
+        "action": "PLAY_ALARM",
+        "timestamp": auth_timestamp
+    }
+
+    server_signature = sign_payload(payload_to_sign)
+
+    return {
+        "status": "authorized",
+        "timestamp": auth_timestamp,
+        "signature": server_signature
     }
