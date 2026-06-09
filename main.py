@@ -83,11 +83,33 @@ def health():
     return {"status": "ok"}
 
 
-# Replace your current /api/v1/rules endpoint with this in main.py
+# Look for your existing get_secure_rules function and replace it with this:
 
 @app.post("/api/v1/rules")
-def get_secure_rules(payload: dict):
-    # TEMPORARY BYPASS: Directly return the rules to test the extension connection
+def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
+    device_id = body.get("device_id")
+    timestamp = body.get("timestamp")
+
+    if not device_id or not timestamp or not x_auth_token:
+        raise HTTPException(status_code=400, detail="Missing parameters")
+
+    # --- REPLAY ATTACK MITIGATION ---
+    # Rejects requests if the client's timestamp is older than 5 minutes (300 seconds)
+    current_time = int(time.time())
+    if abs(current_time - int(timestamp)) > 300:
+        raise HTTPException(status_code=401, detail="Request expired. Replay attack detected.")
+
+    # --- CRYPTOGRAPHIC VERIFICATION ---
+    from security import verify_raw_signature
+    if not verify_raw_signature(device_id, timestamp, x_auth_token):
+        raise HTTPException(status_code=403, detail="Signature verification failed.")
+
+    # Update device heartbeat
+    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    if device:
+        device.last_seen = datetime.now(timezone.utc)
+        db.commit()
+
     return {
         "isActive": True,
         "rules": [
@@ -95,7 +117,6 @@ def get_secure_rules(payload: dict):
             "//div[contains(@class,'commonModal-wrap')]//div[contains(@class,'buttonBox')]//div[contains(.,'Try Again Later')]"
         ]
     }
-
 
 # -------------------------------------------------
 # Static Files & Lifecycle
