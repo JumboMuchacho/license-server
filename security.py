@@ -42,3 +42,28 @@ def verify_raw_signature(device_id: str, timestamp: int, incoming_signature: str
         return hmac.compare_digest(computed_signature, incoming_signature)
     except Exception:
         return False
+import json
+
+def sign_payload(payload: dict) -> str:
+    """
+    Create a cryptographic signature for a payload.
+    The payload MUST contain a 'device' field.
+    """
+    if "device" not in payload:
+        raise ValueError("Payload missing required 'device' field")
+
+    # Canonical JSON encoding (must match client exactly)
+    raw = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    secret = derive_device_secret(payload["device"])
+
+    return hmac.new(
+        secret,
+        raw,
+        hashlib.sha256
+    ).hexdigest()
