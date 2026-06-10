@@ -11,6 +11,8 @@ class MpesaTransaction(Base):
     phone_number = Column(String)
     amount = Column(Integer)
     status = Column(String, default="PENDING")
+    result_code = Column(Integer, nullable=True)
+    result_desc = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
 
