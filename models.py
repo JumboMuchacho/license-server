@@ -1,8 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, func
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
-
+from billing import MpesaTransaction
 
 class License(Base):
     __tablename__ = "licenses"

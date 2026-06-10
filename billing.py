@@ -1,3 +1,6 @@
+from database import Base
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+
 class MpesaTransaction(Base):
     __tablename__ = "mpesa_transactions"
 
