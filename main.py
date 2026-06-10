@@ -139,7 +139,7 @@ def register_device(request: Request, body: VerifyRequest, db: Session = Depends
 
 
 @app.post("/api/v1/rules")
-@limiter.limit("60/minute")
+@limiter.limit("200/minute")
 def get_secure_rules(
     request: Request,
     body: dict,
