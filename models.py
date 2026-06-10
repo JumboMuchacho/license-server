@@ -31,3 +31,13 @@ class Device(Base):
     last_seen = Column(DateTime, default=datetime.utcnow)
 
     license = relationship("License", back_populates="devices")
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(String, index=True)
+    checkout_request_id = Column(String, unique=True, index=True)
+    amount = Column(Integer)
+    status = Column(String, default="PENDING") # PENDING, SUCCESS, FAILED
+    created_at = Column(DateTime, default=func.now())

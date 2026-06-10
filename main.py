@@ -23,10 +23,18 @@ from security import verify_raw_signature, sign_payload
 
 load_dotenv()
 
+# Determine if we are in production
+is_production = os.getenv("ENV") == "production"
+
 # Initialize the Limiter using the client's remote IP address
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="License Server")
+app = FastAPI(
+    title="License Server",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json"
+)
 
 # Set up SlowAPI state and custom exception handler
 app.state.limiter = limiter
@@ -35,7 +43,6 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Include Admin Control Routes
 app.include_router(admin_router)
 app.include_router(billing_router)
-
 # Mount UI Asset Directory safely if it exists
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
