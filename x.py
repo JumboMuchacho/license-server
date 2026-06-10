@@ -1,23 +1,18 @@
-# Save this in the same directory as security.py
-from security import derive_device_secret
-import hmac
-import hashlib
+import base64
+from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-# YOUR TEST DATA
-# Ensure these match the JSON body in Postman exactly
-device_id = "test-device-123"
-timestamp = 1718000000
+# USE YOUR .env VALUES HERE FOR TESTING
+shortcode = os.getenv("MPESA_SHORTCODE")
+passkey = os.getenv("MPESA_PASSKEY")
+timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
 
-# 1. Derive the key using the function from your security.py
-secret = derive_device_secret(device_id)
+# 1. Test Password Generation
+data_to_encode = f"{shortcode}{passkey}{timestamp}"
+encoded = base64.b64encode(data_to_encode.encode()).decode()
+print(f"Generated Password: {encoded}")
 
-# 2. Build the string exactly as verify_raw_signature does
-message = f"{device_id}:{timestamp}".encode("utf-8")
-
-# 3. Create the signature
-signature = hmac.new(secret, message, hashlib.sha256).hexdigest()
-
-print(f"--- POSTMAN CONFIGURATION ---")
-print(f"HEADER [x-auth-token]: {signature}")
-print(f"JSON BODY [device_id]: {device_id}")
-print(f"JSON BODY [timestamp]: {timestamp}")
+# 2. Verify Credentials
+print(f"Checking Shortcode: {shortcode}")
+print(f"Checking Passkey Length: {len(passkey) if passkey else 0}")

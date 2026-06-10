@@ -18,13 +18,26 @@ def process_callback_data(db: Session, data: dict):
     stk_callback = data.get("Body", {}).get("stkCallback", {})
     checkout_id = stk_callback.get("CheckoutRequestID")
     result_code = stk_callback.get("ResultCode")
+    result_desc = stk_callback.get("ResultDesc")
 
-    # Double-credit prevention: only update if not already SUCCESS
+    print(f"DEBUG: Processing callback for {checkout_id} with ResultCode: {result_code}")
+
+    # 1. Fetch transaction
     transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
+
     if transaction and transaction.status != "SUCCESS":
-        transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
+        # 2. Determine final status
+        # ResultCode 0 is success, everything else is failure
+        new_status = "SUCCESS" if result_code == 0 else "FAILED"
+
+        # 3. Update fields
+        transaction.status = new_status
+        transaction.result_desc = result_desc  # Helpful for debugging why it failed
         transaction.completed_at = datetime.utcnow()
+
+        # 4. Commit to DB
         db.commit()
+        print(f"DEBUG: Transaction {checkout_id} updated to {new_status}")
 
 @router.post("/stkpush")
 async def initiate_stk_push(

@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import create_engine, pool
 from database import Base
 import models # This ensures your models are registered
 from alembic import context
@@ -53,26 +52,20 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+from sqlalchemy import create_engine # Make sure this is imported
+
 def run_migrations_online():
-    # Get the URL from the environment
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        # This line bridges the gap between .ini and your .env
-        url=os.getenv("DATABASE_URL")
-    )
+    # Use the variable from your .env file
+    db_url = os.getenv("DATABASE_URL")
+
+    # Create the engine directly using the variable
+    connectable = create_engine(db_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata
         )
 
         with context.begin_transaction():
             context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
