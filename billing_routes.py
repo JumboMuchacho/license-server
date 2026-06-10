@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request, Header, HTTPException, Backgrou
 from sqlalchemy.orm import Session
 from database import get_db
 from billing import MpesaTransaction
-from security_mpesa import verify_safaricom_ip
+from security_mpesa import verify_safaricom_ips
 from security import verify_raw_signature
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
