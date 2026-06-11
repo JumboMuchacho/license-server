@@ -13,7 +13,7 @@ from schemas import STKPushRequest
 router = APIRouter(prefix="/api/v1/mpesa")
 
 def process_callback_data(data: dict):
-    """Background task to handle M-Pesa callback."""
+    """Background task to handle M-Pesa callback and update license tokens."""
     print(f"DEBUG: Background task started for payload: {data}")
     db = SessionLocal()
     try:
@@ -22,6 +22,13 @@ def process_callback_data(data: dict):
         result_code = stk_callback.get("ResultCode")
         result_desc = stk_callback.get("ResultDesc")
 
+        # Extract amount from metadata if available (standard M-Pesa callback structure)
+        metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+        amount = 0
+        for item in metadata:
+            if item.get("Name") == "Amount":
+                amount = item.get("Value", 0)
+
         # Update the transaction record
         transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
         if transaction:
@@ -29,11 +36,23 @@ def process_callback_data(data: dict):
             transaction.result_code = result_code
             transaction.result_desc = result_desc
             transaction.completed_at = datetime.utcnow()
+
+            # --- TOKEN UPDATE LOGIC ---
+            if transaction.status == "SUCCESS":
+                # Find the linked license
+                lic = db.query(License).filter(License.license_key == transaction.license_key).first()
+                if lic:
+                    # Math: 1 token for every 100 KES (adjust as needed)
+                    tokens_added = int(amount) // 100
+                    lic.token_balance += tokens_added
+                    print(f"DEBUG: Added {tokens_added} tokens to license {lic.license_key}. New balance: {lic.token_balance}")
+
             db.commit()
             print(f"DEBUG: Transaction {checkout_id} successfully updated to {transaction.status}")
         else:
             print(f"DEBUG: CRITICAL - No transaction found in DB for CheckoutRequestID: {checkout_id}")
     except Exception as e:
+        db.rollback()
         print(f"DEBUG: Error in background task: {e}")
     finally:
         db.close()
@@ -48,18 +67,16 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. Critical: Ensure the license key actually exists
-    # This check prevents the "CRITICAL - No transaction found" error later
+    # 2. License Validation
     valid_license = db.query(License).filter(License.license_key == body.device_id).first()
     if not valid_license:
-        print(f"DEBUG: Failed - License key '{body.device_id}' does not exist in database.")
+        print(f"DEBUG: License key {body.device_id} not found.")
         raise HTTPException(status_code=404, detail="License key not found.")
 
     # 3. Create PENDING record
-    # Wrap in try/except to catch DB failures
     try:
         new_txn = MpesaTransaction(
-            license_key=valid_license.license_key, # Use the verified key
+            license_key=valid_license.license_key,
             phone_number=str(body.phone_number),
             amount=body.amount,
             status="PENDING"
@@ -88,6 +105,7 @@ async def initiate_stk_push(
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
         db.commit()
+        print(f"DEBUG: Created txn {new_txn.id} with CheckoutRequestID: {checkout_id}")
     else:
         new_txn.status = "FAILED"
         db.commit()
@@ -98,6 +116,7 @@ async def initiate_stk_push(
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
     print("DEBUG: Callback endpoint reached!")
     try:
+        # Note: Disable this during local development if your IP isn't allowed
         await verify_safaricom_ip(request)
         data = await request.json()
         print(f"DEBUG: Data received: {data}")
@@ -106,6 +125,4 @@ async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
     except Exception as e:
         print(f"DEBUG: Callback validation failed: {e}")
-        # Note: We return 200 to Safaricom even on error if we want to stop retries,
-        # or 400 if we want them to retry.
         raise HTTPException(status_code=400, detail="Invalid request")
