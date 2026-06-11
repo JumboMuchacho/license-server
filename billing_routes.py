@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from database import get_db, SessionLocal  # Import SessionLocal for background tasks
+from database import get_db, SessionLocal
 from billing import MpesaTransaction
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
 from security import verify_raw_signature
@@ -11,9 +11,8 @@ from schemas import STKPushRequest
 
 router = APIRouter(prefix="/api/v1/mpesa")
 
-# Fix: Create a new session inside the task, or the original session will be closed!
 def process_callback_data(data: dict):
-    db = SessionLocal() # Open new session for background task
+    db = SessionLocal()
     try:
         stk_callback = data.get("Body", {}).get("stkCallback", {})
         checkout_id = stk_callback.get("CheckoutRequestID")
@@ -22,19 +21,29 @@ def process_callback_data(data: dict):
 
         print(f"DEBUG: Processing callback for {checkout_id}")
 
+        # Try searching by CheckoutRequestID first
         transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
+
+        # Fallback: If not found, search for the most recent PENDING transaction
+        # This handles race conditions where the ID might not have saved yet
+        if not transaction:
+            print(f"DEBUG: {checkout_id} not found by ID, checking for most recent pending txn.")
+            transaction = db.query(MpesaTransaction).filter(
+                MpesaTransaction.status == "PENDING"
+            ).order_by(MpesaTransaction.created_at.desc()).first()
 
         if transaction:
             transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
             transaction.result_code = result_code
             transaction.result_desc = result_desc
+            transaction.checkout_request_id = checkout_id # Ensure it's linked
             transaction.completed_at = datetime.utcnow()
             db.commit()
-            print(f"DEBUG: Transaction {checkout_id} updated.")
+            print(f"DEBUG: Transaction {transaction.id} updated successfully.")
         else:
-            print(f"DEBUG: Transaction {checkout_id} not found.")
+            print(f"DEBUG: CRITICAL - No pending transaction found to link with {checkout_id}")
     finally:
-        db.close() # Always close the session
+        db.close()
 
 @router.post("/stkpush")
 async def initiate_stk_push(
@@ -45,7 +54,6 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 1. Create and commit to get the ID
     new_txn = MpesaTransaction(
         license_key=body.device_id,
         phone_number=str(body.phone_number),
@@ -54,9 +62,8 @@ async def initiate_stk_push(
     )
     db.add(new_txn)
     db.commit()
-    db.refresh(new_txn) # Ensures new_txn has the DB primary key
+    db.refresh(new_txn)
 
-    # 2. Trigger M-Pesa
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
         db=db,
@@ -67,16 +74,13 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-    # 3. Save the CheckoutRequestID
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")
 
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
-        db.commit() # MUST commit the checkout_id so the callback can find it
-        print(f"DEBUG: Saved CheckoutRequestID {checkout_id} to transaction {new_txn.id}")
-    else:
-        print(f"DEBUG: Failed to get CheckoutRequestID from Safaricom: {resp_data}")
+        db.commit()
+        print(f"DEBUG: Linked {checkout_id} to txn {new_txn.id}")
 
     return resp_data
 
@@ -84,8 +88,5 @@ async def initiate_stk_push(
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
     await verify_safaricom_ip(request)
     data = await request.json()
-
-    # Do not pass 'db' dependency here, it gets closed after this return!
     bg_tasks.add_task(process_callback_data, data)
-
     return {"ResultCode": 0, "ResultDesc": "Accepted"}
