@@ -92,7 +92,7 @@ async def initiate_stk_push(
 
     # 4. Trigger M-Pesa STK Push
     access_token = get_mpesa_access_token()
-   response = trigger_stk_push(
+    response = trigger_stk_push(
         db=db,                          # Added this
         license_key=valid_license.license_key, # Added this
         phone_number=body.phone_number,
