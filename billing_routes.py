@@ -45,6 +45,7 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
+    # 1. Create and commit to get the ID
     new_txn = MpesaTransaction(
         license_key=body.device_id,
         phone_number=str(body.phone_number),
@@ -53,11 +54,12 @@ async def initiate_stk_push(
     )
     db.add(new_txn)
     db.commit()
-    db.refresh(new_txn)
+    db.refresh(new_txn) # Ensures new_txn has the DB primary key
 
+    # 2. Trigger M-Pesa
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
-        db=db, # Pass db if service needs it, but handle ID update here
+        db=db,
         phone_number=body.phone_number,
         amount=body.amount,
         license_key=body.device_id,
@@ -65,10 +67,16 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
+    # 3. Save the CheckoutRequestID
     resp_data = response.json()
-    # Explicitly update and commit the ID here
-    new_txn.checkout_request_id = resp_data.get("CheckoutRequestID")
-    db.commit()
+    checkout_id = resp_data.get("CheckoutRequestID")
+
+    if checkout_id:
+        new_txn.checkout_request_id = checkout_id
+        db.commit() # MUST commit the checkout_id so the callback can find it
+        print(f"DEBUG: Saved CheckoutRequestID {checkout_id} to transaction {new_txn.id}")
+    else:
+        print(f"DEBUG: Failed to get CheckoutRequestID from Safaricom: {resp_data}")
 
     return resp_data
 
