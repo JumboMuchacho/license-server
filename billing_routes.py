@@ -27,18 +27,17 @@ def process_callback_data(db: Session, data: dict):
 
     if transaction and transaction.status != "SUCCESS":
         # 2. Determine final status
-        # ResultCode 0 is success, everything else is failure
         new_status = "SUCCESS" if result_code == 0 else "FAILED"
 
         # 3. Update fields
         transaction.status = new_status
+        transaction.result_code = result_code  # <--- ADD THIS
         transaction.result_desc = result_desc  # Helpful for debugging why it failed
         transaction.completed_at = datetime.utcnow()
 
         # 4. Commit to DB
         db.commit()
         print(f"DEBUG: Transaction {checkout_id} updated to {new_status}")
-
 @router.post("/stkpush")
 async def initiate_stk_push(
     body: STKPushRequest,
@@ -49,20 +48,37 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. Get Token
+    # 2. Pre-create the transaction record in your database
+    # This ensures the callback has a row to update!
+    new_txn = MpesaTransaction(
+        license_key=body.device_id,
+        phone_number=str(body.phone_number),
+        amount=body.amount,
+        status="PENDING"
+    )
+    db.add(new_txn)
+    db.commit()
+    db.refresh(new_txn)
+
+    # 3. Get M-Pesa Token
     access_token = get_mpesa_access_token()
 
-    # 3. Call Service
+    # 4. Call Service
     response = trigger_stk_push(
         db=db,
         phone_number=body.phone_number,
         amount=body.amount,
-        license_key=body.device_id, # Assuming device_id is linked to the license
+        license_key=body.device_id,
         account_reference=body.device_id,
         access_token=access_token
     )
 
-    return response.json()
+    # 5. Update with the CheckoutRequestID from Safaricom
+    resp_data = response.json()
+    new_txn.checkout_request_id = resp_data.get("CheckoutRequestID")
+    db.commit()
+
+    return resp_data
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks, db: Session = Depends(get_db)):
