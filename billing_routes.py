@@ -92,13 +92,14 @@ async def initiate_stk_push(
 
     # 4. Trigger M-Pesa STK Push
     access_token = get_mpesa_access_token()
-    response = trigger_stk_push(
+   response = trigger_stk_push(
+        db=db,                          # Added this
+        license_key=valid_license.license_key, # Added this
         phone_number=body.phone_number,
         amount=body.amount,
         account_reference=valid_license.license_key,
         access_token=access_token
     )
-
     # 5. Link CheckoutRequestID
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")

@@ -12,10 +12,10 @@ def generate_mpesa_password(shortcode: str, passkey: str) -> str:
     return base64.b64encode(data_to_encode.encode()).decode(), timestamp
 
 def trigger_stk_push(db: Session, phone_number: int, amount: int, license_key: str, account_reference: str, access_token: str):
-    """Builds payload, triggers STK Push, and saves the transaction to the database."""
+    """Builds payload and triggers STK Push."""
     shortcode = os.getenv("MPESA_SHORTCODE")
     passkey = os.getenv("MPESA_PASSKEY")
-    callback_url = "https://license-server-lewp.onrender.com/api/v1/mpesa/callback"
+    callback_url = os.getenv("MPESA_CALLBACK_URL")
 
     password, timestamp = generate_mpesa_password(shortcode, passkey)
 
@@ -35,22 +35,14 @@ def trigger_stk_push(db: Session, phone_number: int, amount: int, license_key: s
 
     headers = {"Authorization": f"Bearer {access_token}"}
 
+    # Trigger the request
     response = requests.post(
         "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
         json=payload,
-        headers=headers
+        headers=headers,
+        timeout=10
     )
 
-    # Save to database if request was successful
-    if response.status_code == 200:
-        res_data = response.json()
-        new_tx = MpesaTransaction(
-            checkout_request_id=res_data.get("CheckoutRequestID"),
-            phone_number=str(phone_number),
-            amount=amount,
-            license_key=license_key
-        )
-        db.add(new_tx)
-        db.commit()
-
+    # Note: We no longer create the transaction record here because
+    # billing_routes.py handles it to avoid duplicate entries.
     return response
