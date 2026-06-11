@@ -20,43 +20,42 @@ def process_callback_data(data: dict):
         stk_callback = data.get("Body", {}).get("stkCallback", {})
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
-        result_desc = stk_callback.get("ResultDesc")
 
-        # Extract amount from metadata if available (standard M-Pesa callback structure)
+        # 1. Safely extract and convert amount to float, then integer
         metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
-        amount = 0
+        amount = 0.0
         for item in metadata:
             if item.get("Name") == "Amount":
-                amount = item.get("Value", 0)
+                amount = float(item.get("Value", 0))
 
-        # Update the transaction record
+        # 2. Update transaction
         transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
         if transaction:
             transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
-            transaction.result_code = result_code
-            transaction.result_desc = result_desc
-            transaction.completed_at = datetime.utcnow()
 
-            # --- TOKEN UPDATE LOGIC ---
+            # --- FIXED TOKEN UPDATE LOGIC ---
             if transaction.status == "SUCCESS":
-                # Find the linked license
                 lic = db.query(License).filter(License.license_key == transaction.license_key).first()
                 if lic:
-                    # Math: 1 token for every 100 KES (adjust as needed)
-                    tokens_added = int(amount) // 100
-                    lic.token_balance += tokens_added
-                    print(f"DEBUG: Added {tokens_added} tokens to license {lic.license_key}. New balance: {lic.token_balance}")
+                    # Logic: 1 token = 100 KES.
+                    # Use integer division // to ensure whole tokens.
+                    tokens_added = int(amount // 100)
+
+                    if tokens_added > 0:
+                        lic.token_balance += tokens_added
+                        db.add(lic) # Ensure SQLAlchemy tracks the change
+                        print(f"DEBUG: Added {tokens_added} tokens. New balance: {lic.token_balance}")
+                    else:
+                        print(f"DEBUG: Amount {amount} too low for tokens.")
 
             db.commit()
-            print(f"DEBUG: Transaction {checkout_id} successfully updated to {transaction.status}")
         else:
-            print(f"DEBUG: CRITICAL - No transaction found in DB for CheckoutRequestID: {checkout_id}")
+            print(f"DEBUG: CRITICAL - No transaction found for {checkout_id}")
     except Exception as e:
         db.rollback()
         print(f"DEBUG: Error in background task: {e}")
     finally:
         db.close()
-
 @router.post("/stkpush")
 async def initiate_stk_push(
     body: STKPushRequest,
