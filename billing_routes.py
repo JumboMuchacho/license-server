@@ -40,13 +40,10 @@ def process_callback_data(data: dict):
                     if tokens_added > 0:
                         lic.token_balance += tokens_added
                         print(f"DEBUG: Added {tokens_added} tokens. New balance: {lic.token_balance}")
-                    else:
-                        print(f"DEBUG: Amount {amount} too low for tokens.")
 
             db.commit()
             if 'lic' in locals() and lic:
                 db.refresh(lic)
-                print(f"DEBUG: COMMIT SUCCESSFUL. DB Balance is now: {lic.token_balance}")
         else:
             print(f"DEBUG: CRITICAL - No transaction found for {checkout_id}")
 
@@ -69,20 +66,7 @@ async def initiate_stk_push(
     if not valid_license:
         raise HTTPException(status_code=404, detail="License key not found.")
 
-    try:
-        new_txn = MpesaTransaction(
-            license_key=valid_license.license_key,
-            phone_number=str(body.phone_number),
-            amount=body.amount,
-            status="PENDING"
-        )
-        db.add(new_txn)
-        db.commit()
-        db.refresh(new_txn)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Transaction storage failed.")
-
+    # 1. Trigger M-Pesa STK Push FIRST
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
         db=db,
@@ -93,14 +77,28 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
+    # 2. Only create DB record if API request was accepted
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")
+
     if checkout_id:
-        new_txn.checkout_request_id = checkout_id
-        db.commit()
+        try:
+            new_txn = MpesaTransaction(
+                license_key=valid_license.license_key,
+                phone_number=str(body.phone_number),
+                amount=body.amount,
+                status="PENDING",
+                checkout_request_id=checkout_id
+            )
+            db.add(new_txn)
+            db.commit()
+            print(f"DEBUG: Successfully wrote PENDING transaction: {checkout_id}")
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Transaction storage failed.")
     else:
-        new_txn.status = "FAILED"
-        db.commit()
+        # Handle cases where M-Pesa rejects the request
+        raise HTTPException(status_code=400, detail=f"M-Pesa rejected request: {resp_data}")
 
     return resp_data
 
