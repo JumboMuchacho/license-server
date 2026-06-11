@@ -21,23 +21,14 @@ def process_callback_data(data: dict):
         result_code = stk_callback.get("ResultCode")
         result_desc = stk_callback.get("ResultDesc")
 
-        print(f"DEBUG: Processing callback for {checkout_id}")
-
-        # Search by ID, then fallback to recent PENDING
+        # Update the transaction record
         transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
-        if not transaction:
-            transaction = db.query(MpesaTransaction).filter(MpesaTransaction.status == "PENDING").order_by(MpesaTransaction.created_at.desc()).first()
-
         if transaction:
             transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
             transaction.result_code = result_code
             transaction.result_desc = result_desc
-            transaction.checkout_request_id = checkout_id
             transaction.completed_at = datetime.utcnow()
             db.commit()
-            print(f"DEBUG: Transaction {transaction.id} updated.")
-        else:
-            print(f"DEBUG: CRITICAL - No transaction found for {checkout_id}")
     finally:
         db.close()
 
@@ -56,7 +47,7 @@ async def initiate_stk_push(
     if not valid_license:
         raise HTTPException(status_code=404, detail="License key not found.")
 
-    # 3. Persist PENDING transaction
+    # 3. Create PENDING record
     new_txn = MpesaTransaction(
         license_key=body.device_id,
         phone_number=str(body.phone_number),
@@ -64,32 +55,29 @@ async def initiate_stk_push(
         status="PENDING"
     )
     db.add(new_txn)
-    try:
-        db.commit()
-        db.refresh(new_txn)
-    except Exception as e:
-        db.rollback()
-        print(f"DEBUG: Database commit error: {e}")
-        raise HTTPException(status_code=500, detail="Database write failed")
+    db.commit()
+    db.refresh(new_txn)
 
     # 4. Trigger M-Pesa STK Push
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
-        db=db,
         phone_number=body.phone_number,
         amount=body.amount,
-        license_key=body.device_id,
         account_reference=body.device_id,
         access_token=access_token
     )
 
-    # 5. Save CheckoutRequestID
+    # 5. Link CheckoutRequestID
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
         db.commit()
-        print(f"DEBUG: Linked {checkout_id} to txn {new_txn.id}")
+    else:
+        # Mark as FAILED if M-Pesa rejected the request
+        new_txn.status = "FAILED"
+        new_txn.result_desc = resp_data.get("errorMessage", "Unknown error")
+        db.commit()
 
     return resp_data
 
