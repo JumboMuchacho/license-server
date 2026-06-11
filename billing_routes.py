@@ -1,55 +1,50 @@
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, SessionLocal  # Import SessionLocal for background tasks
 from billing import MpesaTransaction
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
 from security import verify_raw_signature
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
 from datetime import datetime
-# Assuming STKPushRequest is imported from a schemas module
 from schemas import STKPushRequest
 
-# 1. Initialize the router
 router = APIRouter(prefix="/api/v1/mpesa")
 
-# Background task logic for the callback
-def process_callback_data(db: Session, data: dict):
-    stk_callback = data.get("Body", {}).get("stkCallback", {})
-    checkout_id = stk_callback.get("CheckoutRequestID")
-    result_code = stk_callback.get("ResultCode")
-    result_desc = stk_callback.get("ResultDesc")
+# Fix: Create a new session inside the task, or the original session will be closed!
+def process_callback_data(data: dict):
+    db = SessionLocal() # Open new session for background task
+    try:
+        stk_callback = data.get("Body", {}).get("stkCallback", {})
+        checkout_id = stk_callback.get("CheckoutRequestID")
+        result_code = stk_callback.get("ResultCode")
+        result_desc = stk_callback.get("ResultDesc")
 
-    print(f"DEBUG: Processing callback for {checkout_id} with ResultCode: {result_code}")
+        print(f"DEBUG: Processing callback for {checkout_id}")
 
-    # 1. Fetch transaction
-    transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
+        transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
 
-    if transaction and transaction.status != "SUCCESS":
-        # 2. Determine final status
-        new_status = "SUCCESS" if result_code == 0 else "FAILED"
+        if transaction:
+            transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
+            transaction.result_code = result_code
+            transaction.result_desc = result_desc
+            transaction.completed_at = datetime.utcnow()
+            db.commit()
+            print(f"DEBUG: Transaction {checkout_id} updated.")
+        else:
+            print(f"DEBUG: Transaction {checkout_id} not found.")
+    finally:
+        db.close() # Always close the session
 
-        # 3. Update fields
-        transaction.status = new_status
-        transaction.result_code = result_code  # <--- ADD THIS
-        transaction.result_desc = result_desc  # Helpful for debugging why it failed
-        transaction.completed_at = datetime.utcnow()
-
-        # 4. Commit to DB
-        db.commit()
-        print(f"DEBUG: Transaction {checkout_id} updated to {new_status}")
 @router.post("/stkpush")
 async def initiate_stk_push(
     body: STKPushRequest,
     x_auth_token: str = Header(...),
     db: Session = Depends(get_db)
 ):
-    # 1. Security Check
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. Pre-create the transaction record in your database
-    # This ensures the callback has a row to update!
     new_txn = MpesaTransaction(
         license_key=body.device_id,
         phone_number=str(body.phone_number),
@@ -60,12 +55,9 @@ async def initiate_stk_push(
     db.commit()
     db.refresh(new_txn)
 
-    # 3. Get M-Pesa Token
     access_token = get_mpesa_access_token()
-
-    # 4. Call Service
     response = trigger_stk_push(
-        db=db,
+        db=db, # Pass db if service needs it, but handle ID update here
         phone_number=body.phone_number,
         amount=body.amount,
         license_key=body.device_id,
@@ -73,23 +65,19 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-    # 5. Update with the CheckoutRequestID from Safaricom
     resp_data = response.json()
+    # Explicitly update and commit the ID here
     new_txn.checkout_request_id = resp_data.get("CheckoutRequestID")
     db.commit()
 
     return resp_data
 
 @router.post("/callback")
-async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    # 1. Security: Block requests not originating from Safaricom IP ranges
+async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
     await verify_safaricom_ip(request)
-
-    # 2. Extract JSON payload
     data = await request.json()
 
-    # 3. Process asynchronously to return 200 OK immediately
-    # Safaricom expects a 200 OK response quickly to stop retrying
-    bg_tasks.add_task(process_callback_data, db, data)
+    # Do not pass 'db' dependency here, it gets closed after this return!
+    bg_tasks.add_task(process_callback_data, data)
 
     return {"ResultCode": 0, "ResultDesc": "Accepted"}
