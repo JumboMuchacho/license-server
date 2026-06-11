@@ -21,58 +21,54 @@ def process_callback_data(data: dict):
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
 
-        # 1. Safely extract and convert amount to float, then integer
         metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
         amount = 0.0
         for item in metadata:
             if item.get("Name") == "Amount":
                 amount = float(item.get("Value", 0))
 
-        # 2. Update transaction
         transaction = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
+
         if transaction:
             transaction.status = "SUCCESS" if result_code == 0 else "FAILED"
+            transaction.completed_at = datetime.utcnow()
 
-            # --- FIXED TOKEN UPDATE LOGIC ---
             if transaction.status == "SUCCESS":
                 lic = db.query(License).filter(License.license_key == transaction.license_key).first()
                 if lic:
-                    # Logic: 1 token = 100 KES.
-                    # Use integer division // to ensure whole tokens.
                     tokens_added = int(amount // 100)
-
                     if tokens_added > 0:
                         lic.token_balance += tokens_added
-                        db.add(lic) # Ensure SQLAlchemy tracks the change
                         print(f"DEBUG: Added {tokens_added} tokens. New balance: {lic.token_balance}")
                     else:
                         print(f"DEBUG: Amount {amount} too low for tokens.")
 
             db.commit()
+            if 'lic' in locals() and lic:
+                db.refresh(lic)
+                print(f"DEBUG: COMMIT SUCCESSFUL. DB Balance is now: {lic.token_balance}")
         else:
             print(f"DEBUG: CRITICAL - No transaction found for {checkout_id}")
+
     except Exception as e:
         db.rollback()
         print(f"DEBUG: Error in background task: {e}")
     finally:
         db.close()
+
 @router.post("/stkpush")
 async def initiate_stk_push(
     body: STKPushRequest,
     x_auth_token: str = Header(...),
     db: Session = Depends(get_db)
 ):
-    # 1. Signature Check
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. License Validation
     valid_license = db.query(License).filter(License.license_key == body.device_id).first()
     if not valid_license:
-        print(f"DEBUG: License key {body.device_id} not found.")
         raise HTTPException(status_code=404, detail="License key not found.")
 
-    # 3. Create PENDING record
     try:
         new_txn = MpesaTransaction(
             license_key=valid_license.license_key,
@@ -83,29 +79,25 @@ async def initiate_stk_push(
         db.add(new_txn)
         db.commit()
         db.refresh(new_txn)
-        print(f"DEBUG: Successfully wrote PENDING transaction to DB: {new_txn.id}")
     except Exception as e:
         db.rollback()
-        print(f"DEBUG: DATABASE WRITE FAILED: {e}")
         raise HTTPException(status_code=500, detail="Transaction storage failed.")
 
-    # 4. Trigger M-Pesa STK Push
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
-        db=db,                          # Added this
-        license_key=valid_license.license_key, # Added this
+        db=db,
+        license_key=valid_license.license_key,
         phone_number=body.phone_number,
         amount=body.amount,
         account_reference=valid_license.license_key,
         access_token=access_token
     )
-    # 5. Link CheckoutRequestID
+
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
         db.commit()
-        print(f"DEBUG: Created txn {new_txn.id} with CheckoutRequestID: {checkout_id}")
     else:
         new_txn.status = "FAILED"
         db.commit()
@@ -114,15 +106,10 @@ async def initiate_stk_push(
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
-    print("DEBUG: Callback endpoint reached!")
     try:
-        # Note: Disable this during local development if your IP isn't allowed
         await verify_safaricom_ip(request)
         data = await request.json()
-        print(f"DEBUG: Data received: {data}")
-
         bg_tasks.add_task(process_callback_data, data)
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
-    except Exception as e:
-        print(f"DEBUG: Callback validation failed: {e}")
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid request")
