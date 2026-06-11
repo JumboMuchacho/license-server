@@ -48,53 +48,48 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. License Validation
-    # IMPORTANT: We assume body.device_id IS the license_key.
-    # If it's not, we must lookup the license associated with this device_id first.
+    # 2. Critical: Ensure the license key actually exists
+    # This check prevents the "CRITICAL - No transaction found" error later
     valid_license = db.query(License).filter(License.license_key == body.device_id).first()
-
     if not valid_license:
-        print(f"DEBUG: No license found for provided key/device: {body.device_id}")
+        print(f"DEBUG: Failed - License key '{body.device_id}' does not exist in database.")
         raise HTTPException(status_code=404, detail="License key not found.")
 
     # 3. Create PENDING record
-    # We explicitly use the validated license_key
+    # Wrap in try/except to catch DB failures
     try:
         new_txn = MpesaTransaction(
-            license_key=valid_license.license_key,
+            license_key=valid_license.license_key, # Use the verified key
             phone_number=str(body.phone_number),
             amount=body.amount,
             status="PENDING"
         )
         db.add(new_txn)
-        db.commit() # Database write happens here
+        db.commit()
         db.refresh(new_txn)
-        print(f"DEBUG: Successfully created PENDING txn {new_txn.id}")
+        print(f"DEBUG: Successfully wrote PENDING transaction to DB: {new_txn.id}")
     except Exception as e:
         db.rollback()
-        print(f"DEBUG: Database error creating transaction: {e}")
-        raise HTTPException(status_code=500, detail="Transaction initialization failed.")
+        print(f"DEBUG: DATABASE WRITE FAILED: {e}")
+        raise HTTPException(status_code=500, detail="Transaction storage failed.")
 
     # 4. Trigger M-Pesa STK Push
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
         phone_number=body.phone_number,
         amount=body.amount,
-        account_reference=valid_license.license_key, # Use verified key
+        account_reference=valid_license.license_key,
         access_token=access_token
     )
 
     # 5. Link CheckoutRequestID
     resp_data = response.json()
     checkout_id = resp_data.get("CheckoutRequestID")
-
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
         db.commit()
-        print(f"DEBUG: Linked CheckoutRequestID: {checkout_id}")
     else:
         new_txn.status = "FAILED"
-        new_txn.result_desc = resp_data.get("errorMessage", "Unknown error")
         db.commit()
 
     return resp_data
