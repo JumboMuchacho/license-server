@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/mpesa")
 
 def process_callback_data(data: dict):
     """Background task to handle M-Pesa callback."""
+    print(f"DEBUG: Background task started for payload: {data}")
     db = SessionLocal()
     try:
         stk_callback = data.get("Body", {}).get("stkCallback", {})
@@ -29,6 +30,11 @@ def process_callback_data(data: dict):
             transaction.result_desc = result_desc
             transaction.completed_at = datetime.utcnow()
             db.commit()
+            print(f"DEBUG: Transaction {checkout_id} successfully updated to {transaction.status}")
+        else:
+            print(f"DEBUG: CRITICAL - No transaction found in DB for CheckoutRequestID: {checkout_id}")
+    except Exception as e:
+        print(f"DEBUG: Error in background task: {e}")
     finally:
         db.close()
 
@@ -45,6 +51,7 @@ async def initiate_stk_push(
     # 2. License Validation
     valid_license = db.query(License).filter(License.license_key == body.device_id).first()
     if not valid_license:
+        print(f"DEBUG: License key {body.device_id} not found.")
         raise HTTPException(status_code=404, detail="License key not found.")
 
     # 3. Create PENDING record
@@ -73,8 +80,8 @@ async def initiate_stk_push(
     if checkout_id:
         new_txn.checkout_request_id = checkout_id
         db.commit()
+        print(f"DEBUG: Created txn {new_txn.id} with CheckoutRequestID: {checkout_id}")
     else:
-        # Mark as FAILED if M-Pesa rejected the request
         new_txn.status = "FAILED"
         new_txn.result_desc = resp_data.get("errorMessage", "Unknown error")
         db.commit()
@@ -83,7 +90,16 @@ async def initiate_stk_push(
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
-    await verify_safaricom_ip(request)
-    data = await request.json()
-    bg_tasks.add_task(process_callback_data, data)
-    return {"ResultCode": 0, "ResultDesc": "Accepted"}
+    print("DEBUG: Callback endpoint reached!")
+    try:
+        await verify_safaricom_ip(request)
+        data = await request.json()
+        print(f"DEBUG: Data received: {data}")
+
+        bg_tasks.add_task(process_callback_data, data)
+        return {"ResultCode": 0, "ResultDesc": "Accepted"}
+    except Exception as e:
+        print(f"DEBUG: Callback validation failed: {e}")
+        # Note: We return 200 to Safaricom even on error if we want to stop retries,
+        # or 400 if we want them to retry.
+        raise HTTPException(status_code=400, detail="Invalid request")
