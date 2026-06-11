@@ -14,23 +14,34 @@ def get_mpesa_access_token():
     if _token_cache["token"] and datetime.now() < _token_cache["expires_at"]:
         return _token_cache["token"]
 
-    # 2. Fetch new token
+    # 2. Fetch credentials with fallback/check
     consumer_key = os.getenv("MPESA_CONSUMER_KEY")
     consumer_secret = os.getenv("MPESA_CONSUMER_SECRET")
+
+    if not consumer_key or not consumer_secret:
+        print("DEBUG: Missing M-Pesa credentials in environment variables.")
+        raise Exception("M-Pesa credentials not configured.")
+
     api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
-    response = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+    try:
+        response = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret), timeout=10)
 
-    if response.status_code == 200:
+        # Log response status for troubleshooting
+        if response.status_code != 200:
+            print(f"DEBUG: M-Pesa Auth failed. Status: {response.status_code}, Response: {response.text}")
+            raise Exception(f"Failed to authenticate: {response.text}")
+
         data = response.json()
         token = data["access_token"]
-        # Safaricom tokens usually expire in 3600 seconds
-        expires_in = int(data["expires_in"])
+        expires_in = int(data.get("expires_in", 3600))
 
-        # Cache the token and set expiration time
+        # Cache the token
         _token_cache["token"] = token
         _token_cache["expires_at"] = datetime.now() + timedelta(seconds=expires_in - 60)
 
         return token
-    else:
-        raise Exception(f"Failed to authenticate with M-Pesa: {response.text}")
+
+    except requests.exceptions.RequestException as e:
+        print(f"DEBUG: Network error connecting to M-Pesa: {e}")
+        raise Exception("Could not connect to M-Pesa authentication service.")
