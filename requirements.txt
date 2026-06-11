@@ -6,5 +6,6 @@ psycopg2-binary
 python-dotenv
 requests
 python-jose[cryptography]
+httpcore==1.0.7
 httpx==0.28.1
 slowapi
