@@ -9,7 +9,11 @@ import models # This ensures your models are registered
 from alembic import context
 
 # 1. Load environment variables so DATABASE_URL is available
-load_dotenv()
+# Force load from the current directory
+load_dotenv(dotenv_path=os.path.join(os.getcwd(), ".env"))
+
+# Debug to verify it's loaded
+print(f"DEBUG: Connecting to {os.getenv('DATABASE_URL')}")
 
 # this is the Alembic Config object
 config = context.config
@@ -56,11 +60,11 @@ def run_migrations_offline() -> None:
 from sqlalchemy import create_engine # Make sure this is imported
 
 def run_migrations_online():
-    # Use the variable from your .env file
-    db_url = os.getenv("DATABASE_URL")
+    # Import the engine directly from your database.py
+    # This ensures consistency with your app's actual connection
+    from database import engine
 
-    # Create the engine directly using the variable
-    connectable = create_engine(db_url, poolclass=pool.NullPool)
+    connectable = engine
 
     with connectable.connect() as connection:
         context.configure(
