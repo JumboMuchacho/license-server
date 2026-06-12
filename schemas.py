@@ -7,5 +7,8 @@ class STKPushRequest(BaseModel):
     device_id: str
     phone_number: int
     amount: int
-    # Timestamp is good practice for replay protection
+    timestamp: int
+
+class ConsumeTokenRequest(BaseModel):
+    device_id: str
     timestamp: int
