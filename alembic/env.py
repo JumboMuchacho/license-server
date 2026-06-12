@@ -1,4 +1,5 @@
 import os
+print(f"DEBUG: Connecting to {os.getenv('DATABASE_URL')}")
 from dotenv import load_dotenv
 from logging.config import fileConfig
 
