@@ -1,6 +1,5 @@
 import hmac
 import hashlib
-import binascii
 
 # Constants from your security.py
 SALT = b"popup_detector_v2_secure_salt_2024"
@@ -8,7 +7,8 @@ PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
 def generate_header_token(device_id, timestamp):
-    # 1. Derive the secret key (same as your server)
+    """Generates the X-Auth-Token using the device_id as the source of truth."""
+    # 1. Derive the secret key
     derived_key = hashlib.pbkdf2_hmac(
         hash_name="sha256",
         password=device_id.encode("utf-8"),
@@ -17,7 +17,7 @@ def generate_header_token(device_id, timestamp):
         dklen=KEY_LENGTH,
     )
 
-    # 2. Rebuild the message string
+    # 2. Rebuild the message string (must match server format exactly)
     message = f"{device_id}:{timestamp}"
 
     # 3. Compute HMAC-SHA256 signature
@@ -30,8 +30,9 @@ def generate_header_token(device_id, timestamp):
     return signature
 
 # --- SET YOUR TEST DATA HERE ---
-my_license_key = "E5CB-E868-CEF9-456E"
-my_timestamp = 1718045600 # Ensure this matches your JSON body exactly
+# Use the actual device_id string you are using for registration
+my_device_id = "YOUR_DEVICE_ID_HERE"
+my_timestamp = 1718045600 # Ensure this matches the timestamp in your request body
 
-token = generate_header_token(my_license_key, my_timestamp)
+token = generate_header_token(my_device_id, my_timestamp)
 print(f"HEADER x-auth-token: {token}")

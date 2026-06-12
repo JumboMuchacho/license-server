@@ -3,357 +3,109 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>License Admin Console</title>
-
+<title>Admin Dashboard | Device Management</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{
---bg:#0f172a;
---panel:#111827;
---card:#1e293b;
---border:#334155;
---text:#f1f5f9;
---muted:#94a3b8;
---accent:#6366f1;
---accent-hover:#818cf8;
---success:#10b981;
---danger:#ef4444;
-}
-
-[data-theme="light"]{
---bg:#f8fafc;
---panel:#ffffff;
---card:#ffffff;
---border:#e2e8f0;
---text:#0f172a;
---muted:#64748b;
---accent:#4f46e5;
---accent-hover:#6366f1;
-}
-
-*{box-sizing:border-box;}
-body{
-margin:0;
-font-family:'Inter',sans-serif;
-background:var(--bg);
-color:var(--text);
-transition:.3s ease;
-}
-
-/* Layout */
-.container{
-max-width:1200px;
-margin:auto;
-padding:30px 20px 60px;
-}
-
-.header{
-display:flex;
-justify-content:space-between;
-align-items:center;
-margin-bottom:30px;
-gap:15px;
-flex-wrap:wrap;
-}
-
-.header h1{
-font-size:22px;
-margin:0;
-font-weight:700;
-letter-spacing:.3px;
-}
-
-.header-actions{
-display:flex;
-align-items:center;
-gap:10px;
-}
-
-.card{
-background:var(--card);
-border:1px solid var(--border);
-border-radius:18px;
-padding:22px;
-margin-bottom:24px;
-box-shadow:0 10px 25px rgba(0,0,0,0.25);
-}
-
-/* Buttons */
-button{
-cursor:pointer;
-border-radius:10px;
-border:none;
-padding:10px 16px;
-font-size:13px;
-font-weight:600;
-transition:.2s;
-}
-
-.primary{
-background:var(--accent);
-color:#fff;
-}
-.primary:hover{background:var(--accent-hover);}
-
-.secondary{
-background:transparent;
-border:1px solid var(--border);
-color:var(--muted);
-}
-.secondary:hover{border-color:var(--accent);color:var(--accent);}
-
-.danger{
-background:rgba(239,68,68,.1);
-border:1px solid var(--danger);
-color:var(--danger);
-}
-
-.icon-btn{
-width:40px;
-height:40px;
-display:flex;
-align-items:center;
-justify-content:center;
-background:var(--panel);
-border:1px solid var(--border);
-border-radius:12px;
-cursor:pointer;
-}
-
-/* Inputs */
-input{
-width:100%;
-padding:10px 12px;
-border-radius:10px;
-border:1px solid var(--border);
-background:var(--panel);
-color:var(--text);
-font-size:13px;
-outline:none;
-}
-
-.input-grid{
-display:grid;
-grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-gap:12px;
-}
-
-/* Table */
-.table-wrapper{
-overflow-x:auto;
-border-radius:16px;
-}
-
-table{
-width:100%;
-border-collapse:collapse;
-min-width:850px;
-}
-
-th{
-text-align:left;
-padding:16px;
-font-size:11px;
-text-transform:uppercase;
-letter-spacing:.7px;
-color:var(--muted);
-border-bottom:1px solid var(--border);
-}
-
-td{
-padding:16px;
-border-bottom:1px solid var(--border);
-vertical-align:top;
-font-size:13px;
-}
-
-/* Toast */
-.toast{
-position:fixed;
-bottom:20px;
-right:20px;
-background:var(--panel);
-border:1px solid var(--border);
-padding:12px 18px;
-border-radius:12px;
-font-size:13px;
-box-shadow:0 8px 20px rgba(0,0,0,0.3);
-opacity:0;
-transform:translateY(20px);
-transition:.3s;
-}
-.toast.show{
-opacity:1;
-transform:translateY(0);
-}
+:root { --bg:#0f172a; --card:#1e293b; --border:#334155; --text:#f1f5f9; --muted:#94a3b8; --accent:#6366f1; --danger:#ef4444; }
+body { margin:0; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); padding:40px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.3); }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th { text-align:left; color:var(--muted); font-size:12px; text-transform:uppercase; padding:12px; border-bottom:1px solid var(--border); }
+td { padding:16px; border-bottom:1px solid var(--border); font-size:14px; }
+button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-size:12px; font-weight:600; transition:.2s; }
+.secondary { background:var(--border); color:#fff; }
+.danger { background:var(--danger); color:#fff; }
+.status-badge { padding:4px 8px; border-radius:6px; font-size:11px; font-weight:bold; }
+.status-active { background:#065f46; color:#34d399; }
+.status-inactive { background:#991b1b; color:#f87171; }
 </style>
 </head>
+<body>
 
-<body data-theme="dark">
-
-<div class="container">
-
-<div id="login-section" class="card" style="max-width:400px;margin:120px auto;text-align:center;">
-<h2 style="margin-top:0;">Admin Access</h2>
-<button class="primary" style="width:100%;" onclick="login()">Continue with Google</button>
+<div id="login-section" style="max-width:400px; margin:100px auto; text-align:center;">
+    <h2>Admin Access</h2>
+    <button class="secondary" style="padding:12px 24px;" onclick="login()">Continue with Google</button>
 </div>
 
-<div id="admin-panel" style="display:none;">
+<div id="admin-panel" style="display:none; max-width:1000px; margin:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h1>Device Registry</h1>
+        <button class="secondary" onclick="logout()">Logout</button>
+    </div>
 
-<div class="header">
-<h1>License Control Center</h1>
-<div class="header-actions">
-<div class="icon-btn" onclick="toggleTheme()">🌓</div>
-<button class="secondary" onclick="logout()">Logout</button>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Device ID</th>
+                    <th>Status</th>
+                    <th>Tokens</th>
+                    <th>Last Seen</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="devices-tbody"></tbody>
+        </table>
+    </div>
 </div>
-</div>
-
-<div class="card">
-<h3 style="margin-top:0;">Create New License</h3>
-<div class="input-grid">
-<input id="max_devices" type="number" placeholder="Max Devices" value="1">
-<input id="days" type="number" placeholder="Validity (Days)" value="30">
-<input id="user_email" type="text" placeholder="Assigned User (Optional)">
-<button class="primary" onclick="create()">Generate License</button>
-</div>
-</div>
-
-<div class="card table-wrapper">
-<table>
-<thead>
-<tr>
-<th>License</th>
-<th>Status</th>
-<th>Usage</th>
-<th>Tokens</th>
-<th>Expiry</th>
-<th>Actions</th>
-</tr>
-</thead>
-<tbody id="licenses-tbody"></tbody>
-</table>
-</div>
-
-</div>
-</div>
-
-<div id="toast" class="toast"></div>
 
 <script>
 const SB_URL="https://efhcunpogynphopqcqze.supabase.co";
 const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmaGN1bnBvZ3lucGhvcHFjcXplIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1MzgzOTIsImV4cCI6MjA4NDExNDM5Mn0.Zg2_kT7aqrOAZTMP-RHuct41eCap99SMSau0IPaAG58";
-const _supabase=supabase.createClient(SB_URL,SB_KEY);
+const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
-function showToast(msg){
-const t=document.getElementById("toast");
-t.innerText=msg;
-t.classList.add("show");
-setTimeout(()=>t.classList.remove("show"),2500);
+async function getHeaders() {
+    const {data:{session}} = await _supabase.auth.getSession();
+    return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
 }
 
-function toggleTheme(){
-const b=document.body;
-b.setAttribute("data-theme", b.getAttribute("data-theme")==="dark"?"light":"dark");
+async function load() {
+    const r = await fetch("/admin/devices", { headers: await getHeaders() });
+    const data = await r.json();
+    const tbody = document.getElementById("devices-tbody");
+    tbody.innerHTML = data.map(d => `
+        <tr>
+            <td style="font-family:monospace; color:var(--accent);">${d.device_id}</td>
+            <td><span class="status-badge ${d.active ? 'status-active' : 'status-inactive'}">${d.active ? 'Active' : 'Suspended'}</span></td>
+            <td style="color:#fbbf24; font-weight:700;">${d.token_balance}</td>
+            <td style="color:var(--muted);">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+            <td>
+                <button class="secondary" onclick="updateBalance('${d.device_id}')">Add Tokens</button>
+                <button class="danger" onclick="deleteDevice('${d.device_id}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
 }
 
-async function login(){
-await _supabase.auth.signInWithOAuth({ provider:"google", options:{redirectTo:window.location.href} });
-}
-
-async function logout(){
-await _supabase.auth.signOut();
-location.reload();
-}
-
-async function getHeaders(){
-const {data:{session}}=await _supabase.auth.getSession();
-return{ Authorization:`Bearer ${session?.access_token}`, "Content-Type":"application/json" };
-}
-
-function render(data) {
-  const tbody = document.getElementById("licenses-tbody");
-  tbody.innerHTML = data.map(l => {
-    const exp = l.expires_at ? new Date(l.expires_at).toLocaleDateString() : 'Never';
-    return `
-      <tr class="border-b border-gray-800 hover:bg-slate-800/50 transition">
-        <td class="p-4 font-mono text-sm font-semibold text-indigo-400">${l.license_key}</td>
-        <td class="p-4">
-          <span class="px-2 py-1 rounded text-xs font-bold ${l.active ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}">
-            ${l.active ? 'Active' : 'Revoked'}
-          </span>
-        </td>
-        <td class="p-4 text-sm text-slate-300">
-          ${l.used_devices} / ${l.max_devices} <span class="text-xs text-slate-500">devices</span>
-        </td>
-        <td class="p-4 text-sm font-semibold text-amber-400">
-          ${l.token_balance || 0} <span class="text-xs text-slate-500 font-normal">tokens</span>
-        </td>
-        <td class="p-4 text-sm text-slate-400">${exp}</td>
-        <td class="p-4 flex gap-2">
-          <button onclick="toggleStatus('${l.license_key}', ${l.active})" class="px-3 py-1 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 transition">
-            ${l.active ? 'Revoke' : 'Reactivate'}
-          </button>
-          <button onclick="deleteLic('${l.license_key}')" class="px-3 py-1 text-xs font-medium rounded bg-rose-950/40 text-rose-400 border border-rose-900/50 hover:bg-rose-900/60 transition">
-            Delete
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-}
-
-async function load(){
-  const r=await fetch("/admin/licenses",{headers:await getHeaders()});
-  const data=await r.json();
-  render(data);
-}
-
-async function toggleStatus(k,active){
-  await fetch(`/admin/licenses/${k}/${active?'revoke':'reactivate'}`, {method:"POST",headers:await getHeaders()});
-  load();
-}
-
-async function deleteLic(k){
-  if(confirm("Delete license permanently?")){
-    await fetch(`/admin/licenses/${k}`,{ method:"DELETE",headers:await getHeaders() });
-    showToast("Deleted");
+async function updateBalance(id) {
+    const amount = prompt("Enter tokens to add:");
+    if (!amount) return;
+    await fetch(`/admin/devices/${id}`, {
+        method: "PATCH",
+        headers: await getHeaders(),
+        body: JSON.stringify({ token_balance: parseInt(amount) })
+    });
     load();
-  }
 }
 
-async function create(){
-  await fetch("/admin/licenses",{
-    method:"POST",
-    headers:await getHeaders(),
-    body:JSON.stringify({
-      max_devices:parseInt(document.getElementById("max_devices").value),
-      days:parseInt(document.getElementById("days").value),
-      assigned_users:document.getElementById("user_email").value ? [document.getElementById("user_email").value] : []
-    })
-  });
-  showToast("License created");
-  load();
-}
-
-async function initAuth() {
-  const { data: { session } } = await _supabase.auth.getSession();
-  if (session) {
-    document.getElementById("login-section").style.display = "none";
-    document.getElementById("admin-panel").style.display = "block";
-    load();
-  }
-  _supabase.auth.onAuthStateChange((event, session) => {
-    if (session) {
-      document.getElementById("login-section").style.display = "none";
-      document.getElementById("admin-panel").style.display = "block";
-      load();
+async function deleteDevice(id) {
+    if (confirm("Delete device permanently?")) {
+        await fetch(`/admin/devices/${id}`, { method: "DELETE", headers: await getHeaders() });
+        load();
     }
-  });
 }
 
-initAuth();
+async function login() { await _supabase.auth.signInWithOAuth({ provider: "google" }); }
+async function logout() { await _supabase.auth.signOut(); location.reload(); }
+
+_supabase.auth.onAuthStateChange((e, s) => {
+    if (s) {
+        document.getElementById("login-section").style.display = "none";
+        document.getElementById("admin-panel").style.display = "block";
+        load();
+    }
+});
 </script>
 </body>
 </html>

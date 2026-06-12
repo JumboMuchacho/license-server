@@ -11,8 +11,8 @@ def generate_mpesa_password(shortcode: str, passkey: str) -> str:
     data_to_encode = f"{shortcode}{passkey}{timestamp}"
     return base64.b64encode(data_to_encode.encode()).decode(), timestamp
 
-def trigger_stk_push(db: Session, phone_number: int, amount: int, license_key: str, account_reference: str, access_token: str):
-    """Builds payload and triggers STK Push."""
+def trigger_stk_push(db: Session, phone_number: int, amount: int, device_id: str, access_token: str):
+    """Builds payload and triggers STK Push using device_id as the Account Reference."""
     shortcode = os.getenv("MPESA_SHORTCODE")
     passkey = os.getenv("MPESA_PASSKEY")
     callback_url = os.getenv("MPESA_CALLBACK_URL")
@@ -29,7 +29,7 @@ def trigger_stk_push(db: Session, phone_number: int, amount: int, license_key: s
         "PartyB": shortcode,
         "PhoneNumber": phone_number,
         "CallBackURL": callback_url,
-        "AccountReference": account_reference,
+        "AccountReference": device_id,  # Device ID is the anchor
         "TransactionDesc": "Token Top-up"
     }
 
@@ -43,6 +43,4 @@ def trigger_stk_push(db: Session, phone_number: int, amount: int, license_key: s
         timeout=10
     )
 
-    # Note: We no longer create the transaction record here because
-    # billing_routes.py handles it to avoid duplicate entries.
     return response
