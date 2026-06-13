@@ -2,6 +2,7 @@ import os
 import logging
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
+from sqlalchemy.orm import sessionmaker, declarative_base  # Fix: Added missing import
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -9,10 +10,8 @@ logger = logging.getLogger(__name__)
 # Fetch the raw string
 raw_url = os.getenv("DATABASE_URL", "").strip()
 
-# We need to manually split this to avoid the regex parser
-# Format: postgresql://user:pass@host:port/db #pragma: allowlist secret
 try:
-    # 1. Remove the protocol prefix
+    # 1. Strip protocol prefix
     clean_url = raw_url.replace("postgresql+psycopg2://", "").replace("postgresql://", "").replace("postgres://", "")
 
     # 2. Extract credentials and host info
