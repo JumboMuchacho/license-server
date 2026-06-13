@@ -1,33 +1,42 @@
 import os
 import logging
-from sqlalchemy import create_engine
+from urllib.parse import quote_plus
+from sqlalchemy import create_engine, make_url
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Configure logging for Render deployment debugging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Fetch URL - prioritize Environment Variables over .env for Render
-DATABASE_URL = os.getenv("DATABASE_URL")
+raw_url = os.getenv("DATABASE_URL")
+if not raw_url:
+    raise RuntimeError("DATABASE_URL not set")
 
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
+# 1. Strip whitespace
+url_str = raw_url.strip()
 
-# 1. Standardize prefix: Force the specific postgresql+psycopg2 dialect
-# 2. Clean the string: Remove any accidental whitespace or hidden characters
-url = DATABASE_URL.strip()
+# 2. Fix the driver prefix
+if url_str.startswith("postgres://"):
+    url_str = url_str.replace("postgres://", "postgresql+psycopg2://", 1)
+elif not url_str.startswith("postgresql+psycopg2://"):
+    url_str = url_str.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-if url.startswith("postgres://"):
-    url = url.replace("postgres://", "postgresql+psycopg2://", 1)
-elif not url.startswith("postgresql+psycopg2://"):
-    # If it's already postgresql://, upgrade it to the psycopg2 driver
-    url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+# 3. Use SQLAlchemy's robust URL parser
+try:
+    url_obj = make_url(url_str)
 
-logger.info(f"Connecting to database host: {url.split('@')[-1].split(':')[0]}")
+    # 4. Critical: Ensure the password is URL-encoded
+    # (Fixes issues where passwords contain special characters like '@' or ':')
+    if url_obj.password:
+        url_obj = url_obj.set(password=quote_plus(url_obj.password))
+
+    logger.info(f"Connecting to: {url_obj.host}")
+except Exception as e:
+    logger.error(f"Failed to parse URL: {e}")
+    raise
 
 # Engine configuration
 engine = create_engine(
-    url,
+    url_obj,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
@@ -39,7 +48,6 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
 def init_db():
-    """Syncs models to the database."""
     import models
     Base.metadata.create_all(bind=engine)
 
