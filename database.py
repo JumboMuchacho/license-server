@@ -1,37 +1,38 @@
 import os
 import logging
-from urllib.parse import quote_plus
-from sqlalchemy import create_engine, make_url
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-raw_url = os.getenv("DATABASE_URL")
-if not raw_url:
-    raise RuntimeError("DATABASE_URL not set")
+# Fetch the raw string
+raw_url = os.getenv("DATABASE_URL", "").strip()
 
-# 1. Strip whitespace
-url_str = raw_url.strip()
-
-# 2. Fix the driver prefix
-if url_str.startswith("postgres://"):
-    url_str = url_str.replace("postgres://", "postgresql+psycopg2://", 1)
-elif not url_str.startswith("postgresql+psycopg2://"):
-    url_str = url_str.replace("postgresql://", "postgresql+psycopg2://", 1)
-
-# 3. Use SQLAlchemy's robust URL parser
+# We need to manually split this to avoid the regex parser
+# Format: postgresql://user:pass@host:port/db #pragma: allowlist secret
 try:
-    url_obj = make_url(url_str)
+    # 1. Remove the protocol prefix
+    clean_url = raw_url.replace("postgresql+psycopg2://", "").replace("postgresql://", "").replace("postgres://", "")
 
-    # 4. Critical: Ensure the password is URL-encoded
-    # (Fixes issues where passwords contain special characters like '@' or ':')
-    if url_obj.password:
-        url_obj = url_obj.set(password=quote_plus(url_obj.password))
+    # 2. Extract credentials and host info
+    credentials, host_info = clean_url.split("@")
+    username, password = credentials.split(":", 1)
+    host, rest = host_info.split(":", 1)
+    port, dbname = rest.split("/", 1)
 
-    logger.info(f"Connecting to: {url_obj.host}")
+    # 3. Create the URL object manually
+    url_obj = URL.create(
+        drivername="postgresql+psycopg2",
+        username=username,
+        password=password,
+        host=host,
+        port=int(port),
+        database=dbname
+    )
+    logger.info("URL object constructed successfully.")
 except Exception as e:
-    logger.error(f"Failed to parse URL: {e}")
+    logger.error(f"Manual parsing failed: {e}")
     raise
 
 # Engine configuration
