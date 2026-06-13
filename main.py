@@ -25,11 +25,16 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB on startup
-    init_db()
-    print("Database tables initialized successfully.")
+    # Add a simple retry logic or just log the failure
+    # instead of crashing the entire service on startup
+    try:
+        init_db()
+        print("Database tables initialized successfully.")
+    except Exception as e:
+        print(f"CRITICAL: Could not connect to database: {e}")
+        # Depending on your app, you might want to continue
+        # or raise, but raising here stops the deploy.
     yield
-    # Dispose engine on shutdown
     engine.dispose()
 
 is_production = os.getenv("ENV") == "production"
