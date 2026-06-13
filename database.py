@@ -1,42 +1,20 @@
 import os
 import logging
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
-from sqlalchemy.orm import sessionmaker, declarative_base  # Fix: Added missing import
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Fetch the raw string
-raw_url = os.getenv("DATABASE_URL", "").strip()
+# Fetch the raw URL directly from your Environment Variable
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-try:
-    # 1. Strip protocol prefix
-    clean_url = raw_url.replace("postgresql+psycopg2://", "").replace("postgresql://", "").replace("postgres://", "")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is not set!")
 
-    # 2. Extract credentials and host info
-    credentials, host_info = clean_url.split("@")
-    username, password = credentials.split(":", 1)
-    host, rest = host_info.split(":", 1)
-    port, dbname = rest.split("/", 1)
-
-    # 3. Create the URL object manually
-    url_obj = URL.create(
-        drivername="postgresql+psycopg2",
-        username=username,
-        password=password,
-        host=host,
-        port=int(port),
-        database=dbname
-    )
-    logger.info("URL object constructed successfully.")
-except Exception as e:
-    logger.error(f"Manual parsing failed: {e}")
-    raise
-
-# Engine configuration
+# Engine configuration - SQLAlchemy handles the string natively
 engine = create_engine(
-    url_obj,
+    DATABASE_URL,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
