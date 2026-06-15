@@ -36,8 +36,16 @@ def verify_raw_signature(device_id: str, timestamp: int, incoming_signature: str
             hashlib.sha256
         ).hexdigest()
 
+        # DEBUG LOGS (Check these in your Render Logs)
+        print(f"DEBUG: Input device_id: {device_id}")
+        print(f"DEBUG: Input timestamp: {timestamp}")
+        print(f"DEBUG: Raw String: {raw_message_string}")
+        print(f"DEBUG: Computed: {computed_signature}")
+        print(f"DEBUG: Incoming: {incoming_signature}")
+
         return hmac.compare_digest(computed_signature, incoming_signature)
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: Signature Verification Error: {e}")
         return False
 
 def sign_payload(payload: dict) -> str:
