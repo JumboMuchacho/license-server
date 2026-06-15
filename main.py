@@ -113,7 +113,10 @@ def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(..
     if device:
         device.last_seen = datetime.now(timezone.utc)
         db.commit()
-    return {"isActive": True, "rules": ["//div[contains(@class,'commonModal-wrap')]..."]}
+    return {
+        "isActive": True,
+        "rules": ["//div[contains(@class, 'message')][contains(text(), 'no USDT transaction')]"]
+    }
 
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("30/minute")
