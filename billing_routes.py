@@ -19,22 +19,28 @@ def process_callback_data(data: dict):
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
 
-        # 1. Fetch transaction using the checkout_id
+        # 1. Fetch transaction
         txn = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
-        if not txn: return
+        if not txn:
+            return
 
-        # 2. Extract amount
+        # 2. Extract amount from CallbackMetadata
         metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
         amount = next((float(i["Value"]) for i in metadata if i["Name"] == "Amount"), 0)
 
-        # 3. Direct lookup and update the Device (No License middleman)
+        # 3. Update Device Balance (amount / 10 = tokens)
         device = db.query(models.Device).filter(models.Device.device_id == txn.device_id).first()
 
         if device and result_code == 0:
-            device.token_balance += int(amount)
+            device.token_balance += int(amount / 10)
             txn.status = "SUCCESS"
             db.commit()
+        elif result_code != 0:
+            txn.status = "FAILED"
+            db.commit()
 
+    except Exception as e:
+        print(f"Error in callback processing: {e}")
     finally:
         db.close()
 
@@ -48,18 +54,18 @@ async def initiate_stk_push(
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. Direct Device Lookup
+    # 2. Validate Device
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not registered.")
 
-    # 3. Trigger M-Pesa STK Push
+    # 3. Trigger M-Pesa
     access_token = get_mpesa_access_token()
     response = trigger_stk_push(
         db=db,
         phone_number=body.phone_number,
         amount=body.amount,
-        account_reference=device.device_id, # Use device_id as ref
+        account_reference=device.device_id,
         access_token=access_token
     )
 
@@ -67,20 +73,16 @@ async def initiate_stk_push(
     checkout_id = resp_data.get("CheckoutRequestID")
 
     if checkout_id:
-        try:
-            # 4. Store transaction linked to device_id
-            new_txn = MpesaTransaction(
-                device_id=device.device_id, # Linked to device, not license
-                phone_number=str(body.phone_number),
-                amount=body.amount,
-                status="PENDING",
-                checkout_request_id=checkout_id
-            )
-            db.add(new_txn)
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise HTTPException(status_code=500, detail="Transaction storage failed.")
+        # 4. Store PENDING transaction
+        new_txn = MpesaTransaction(
+            device_id=device.device_id,
+            phone_number=str(body.phone_number),
+            amount=body.amount,
+            status="PENDING",
+            checkout_request_id=checkout_id
+        )
+        db.add(new_txn)
+        db.commit()
     else:
         raise HTTPException(status_code=400, detail=f"M-Pesa rejected request: {resp_data}")
 
@@ -89,9 +91,13 @@ async def initiate_stk_push(
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
     try:
+        # IP Security check is vital for M-Pesa callbacks
         await verify_safaricom_ip(request)
         data = await request.json()
+
+        # Offload to background to respond to Safaricom immediately
         bg_tasks.add_task(process_callback_data, data)
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
-    except Exception:
+    except Exception as e:
+        print(f"Callback security error: {e}")
         raise HTTPException(status_code=400, detail="Invalid request")

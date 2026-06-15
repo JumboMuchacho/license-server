@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Request, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
@@ -25,15 +26,11 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Add a simple retry logic or just log the failure
-    # instead of crashing the entire service on startup
     try:
         init_db()
         print("Database tables initialized successfully.")
     except Exception as e:
         print(f"CRITICAL: Could not connect to database: {e}")
-        # Depending on your app, you might want to continue
-        # or raise, but raising here stops the deploy.
     yield
     engine.dispose()
 
@@ -46,6 +43,15 @@ app = FastAPI(
     docs_url=None if is_production else "/docs",
     redoc_url=None if is_production else "/redoc",
     openapi_url=None if is_production else "/openapi.json"
+)
+
+# --- CORS Middleware ---
+# Replace the wildcard with your specific Extension ID when ready for production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.state.limiter = limiter
@@ -96,6 +102,13 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
         device.last_seen = datetime.now(timezone.utc)
     db.commit()
     return {"status": "success", "device_id": device.device_id, "token_balance": device.token_balance}
+
+@app.get("/api/v1/status")
+def get_device_status(device_id: str, db: Session = Depends(get_db)):
+    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    return {"token_balance": device.token_balance, "is_active": device.token_balance > 0}
 
 @app.post("/api/v1/rules")
 @limiter.limit("200/minute")
