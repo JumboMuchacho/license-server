@@ -5,7 +5,7 @@ from fastapi import Request, HTTPException
 SAFARICOM_IPS = [
     "196.201.214.200", "196.201.214.201", "196.201.212.129",
     "196.201.212.138", "196.201.212.136", "196.201.212.74", "196.201.212.69",
-    "129.222.187.156" # <--- ADDEDD YOUR CURRENT IP HERE FOR TESTING
+    "129.222.147.141" # <--- ADDEDD YOUR CURRENT IP HERE FOR TESTING
 ]
 
 async def verify_safaricom_ips(request: Request):
