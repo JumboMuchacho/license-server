@@ -44,49 +44,37 @@ def process_callback_data(data: dict):
     finally:
         db.close()
 
+import hmac, hashlib
+from security import derive_device_secret
+
 @router.post("/stkpush")
 async def initiate_stk_push(
     body: STKPushRequest,
-    x_auth_token: str = Header(...),
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    # 1. Signature Verification
-    if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
+    # 1. Extract Header
+    x_auth_token = request.headers.get("x-auth-token") or request.headers.get("X-Auth-Token")
+
+    # 2. Re-calculate exactly what the server expects
+    derived_key = derive_device_secret(body.device_id)
+    raw_message_string = f"{body.device_id}:{body.timestamp}"
+    computed_signature = hmac.new(derived_key, raw_message_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    # 3. AUDIT LOGS - This reveals the truth
+    print(f"\n--- SIGNATURE AUDIT ---")
+    print(f"DEBUG: Device ID: {body.device_id}")
+    print(f"DEBUG: Timestamp: {body.timestamp}")
+    print(f"DEBUG: Raw String Expected: {raw_message_string}")
+    print(f"DEBUG: Server Computed Hash: {computed_signature}")
+    print(f"DEBUG: Client Sent Hash:      {x_auth_token}")
+    print(f"DEBUG: Match? {computed_signature == x_auth_token}")
+    print(f"-----------------------\n")
+
+    if not x_auth_token or computed_signature != x_auth_token:
         raise HTTPException(status_code=403, detail="Invalid request signature.")
 
-    # 2. Validate Device
-    device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not registered.")
-
-    # 3. Trigger M-Pesa
-    access_token = get_mpesa_access_token()
-    response = trigger_stk_push(
-        db=db,
-        phone_number=body.phone_number,
-        amount=body.amount,
-        account_reference=device.device_id,
-        access_token=access_token
-    )
-
-    resp_data = response.json()
-    checkout_id = resp_data.get("CheckoutRequestID")
-
-    if checkout_id:
-        # 4. Store PENDING transaction
-        new_txn = MpesaTransaction(
-            device_id=device.device_id,
-            phone_number=str(body.phone_number),
-            amount=body.amount,
-            status="PENDING",
-            checkout_request_id=checkout_id
-        )
-        db.add(new_txn)
-        db.commit()
-    else:
-        raise HTTPException(status_code=400, detail=f"M-Pesa rejected request: {resp_data}")
-
-    return resp_data
+    # ... proceed with STK push ...
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
