@@ -128,7 +128,7 @@ def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(..
         db.commit()
     return {
         "isActive": True,
-        "rules": ["//div[contains(@class, 'message')][contains(text(), 'no USDT transaction')]"]
+        "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction recieved')]"]
     }
 
 @app.post("/api/v1/billing/consume-token")
