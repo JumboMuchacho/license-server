@@ -132,7 +132,7 @@ def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(..
     }
 
 @app.post("/api/v1/billing/consume-token")
-@limiter.limit("30/minute")
+@limiter.limit("100/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid signature.")
