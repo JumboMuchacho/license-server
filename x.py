@@ -32,7 +32,7 @@ def generate_header_token(device_id, timestamp):
 # --- SET YOUR TEST DATA HERE ---
 # Use the actual device_id string you are using for registration
 my_device_id = "YOUR_DEVICE_ID_HERE"
-my_timestamp = 1718045600 # Ensure this matches the timestamp in your request body
+my_timestamp = 1781517010 # Ensure this matches the timestamp in your request body
 
 token = generate_header_token(my_device_id, my_timestamp)
 print(f"HEADER x-auth-token: {token}")
