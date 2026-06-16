@@ -134,15 +134,23 @@ def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(..
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("100/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
+    # 1. Verify Identity
     if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
         raise HTTPException(status_code=403, detail="Invalid signature.")
+
+    # 2. Check existence first
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
-    if not device or not device.active or device.token_balance <= 0:
+
+    if not device:
+        # RETURN 410: The device is gone from the server records
+        raise HTTPException(status_code=410, detail="Device not found in registry.")
+
+    if not device.active or device.token_balance <= 0:
         raise HTTPException(status_code=403, detail="Forbidden or Insufficient balance.")
+
+    # 3. Process
     device.token_balance -= 1
     device.last_seen = datetime.now(timezone.utc)
     db.commit()
 
-    auth_timestamp = int(time.time())
-    server_signature = sign_payload({"device": body.device_id, "action": "PLAY_ALARM", "timestamp": auth_timestamp})
-    return {"status": "authorized", "timestamp": auth_timestamp, "signature": server_signature}
+    return {"status": "authorized", ...}
