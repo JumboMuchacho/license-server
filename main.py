@@ -153,4 +153,4 @@ def consume_token(request: Request, body: ConsumeTokenRequest, x_auth_token: str
     device.last_seen = datetime.now(timezone.utc)
     db.commit()
 
-    return {"status": "authorized", ...}
+    return {"status": "authorized"}
