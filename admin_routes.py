@@ -48,3 +48,17 @@ def delete_device(device_id: str, db: Session = Depends(get_db)):
         db.delete(device)
         db.commit()
     return {"status": "deleted"}
+
+
+@router.get("/analytics")
+async def get_analytics(db: Session = Depends(get_db)):
+    # Calculate totals
+    total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
+    total_txns = db.query(MpesaTransaction).count()
+    success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
+
+    return {
+        "revenue": total_revenue,
+        "total_txns": total_txns,
+        "success_rate": success_rate
+    }
