@@ -2,7 +2,7 @@ import hmac
 import hashlib
 import json
 import os
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # --- Configuration ---
