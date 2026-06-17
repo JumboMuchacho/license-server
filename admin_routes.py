@@ -7,16 +7,17 @@ from database import get_db
 import models
 from billing import MpesaTransaction
 from pydantic import BaseModel
-from security import verify_oauth  # Import the fix
+from security import verify_oauth
 
-router = APIRouter(prefix="/admin/devices", tags=["Admin"])
+# Route prefix set to match your frontend calls
+router = APIRouter(prefix="/admin", tags=["Admin"])
 
 class DeviceUpdate(BaseModel):
     active: Optional[bool] = None
     token_balance: Optional[int] = None
 
-@router.get("")
-def get_all_devices(db: Session = Depends(get_db)):
+@router.get("/devices")
+def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     devices = db.query(models.Device).all()
     return [
         {
@@ -27,7 +28,7 @@ def get_all_devices(db: Session = Depends(get_db)):
         } for d in devices
     ]
 
-@router.patch("/{device_id}")
+@router.patch("/devices/{device_id}")
 async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
@@ -38,7 +39,7 @@ async def update_device_tokens(device_id: str, body: dict, db: Session = Depends
     db.commit()
     return {"new_balance": device.token_balance}
 
-@router.delete("/{device_id}")
+@router.delete("/devices/{device_id}")
 def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if device:
@@ -48,10 +49,10 @@ def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(v
 
 @router.get("/analytics")
 async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
-    # Ensure MpesaTransaction is imported from models
-    total_revenue = db.query(func.sum(models.MpesaTransaction.amount)).filter(models.MpesaTransaction.status == "SUCCESS").scalar() or 0
-    total_txns = db.query(models.MpesaTransaction).count()
-    success_rate = db.query(models.MpesaTransaction).filter(models.MpesaTransaction.status == "SUCCESS").count()
+    # Using imported MpesaTransaction directly
+    total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
+    total_txns = db.query(MpesaTransaction).count()
+    success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
 
     growth = db.query(
         func.date(models.Device.created_at).label("date"),
