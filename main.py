@@ -95,11 +95,11 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
             device_id=body.device_id,
             token_balance=0,
             active=True,
-            last_seen=datetime.now(timezone.utc)
+            created_at=datetime.now(timezone.utc)
         )
         db.add(device)
     else:
-        device.last_seen = datetime.now(timezone.utc)
+        device.created_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "success", "device_id": device.device_id, "token_balance": device.token_balance}
 
@@ -124,7 +124,7 @@ def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(..
 
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if device:
-        device.last_seen = datetime.now(timezone.utc)
+        device.created_at = datetime.now(timezone.utc)
         db.commit()
     return {
         "isActive": True,
@@ -150,7 +150,7 @@ def consume_token(request: Request, body: ConsumeTokenRequest, x_auth_token: str
 
     # 3. Process
     device.token_balance -= 1
-    device.last_seen = datetime.now(timezone.utc)
+    device.created_at = datetime.now(timezone.utc)
     db.commit()
 
     return {"status": "authorized"}

@@ -78,22 +78,43 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
 const SB_URL="https://hcjjyokagkgeqwqjexsf.supabase.co";
 const SB_KEY="YOUR_KEY_HERE";
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
+let growthChart; // Global variable to hold the chart instance
 
 async function getHeaders() {
     const {data:{session}} = await _supabase.auth.getSession();
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
 }
 
+// 1. Initialize Chart
+function initChart(data) {
+    const ctx = document.getElementById('growthChart').getContext('2d');
+    if (growthChart) growthChart.destroy(); // Clear existing chart on refresh
+    growthChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels, // Expecting labels: ['Mon', 'Tue', ...]
+            datasets: [{ label: 'New Devices', data: data.values, borderColor: '#6366f1', fill: true }]
+        }
+    });
+}
+
 async function load() {
+    // Fetch Devices
     const r = await fetch("/admin/devices", { headers: await getHeaders() });
     const data = await r.json();
+
+    // Fetch Analytics (Growth)
+    const analyticsRes = await fetch("/admin/analytics", { headers: await getHeaders() });
+    const analytics = await analyticsRes.json();
+
+    // Render Table
     const tbody = document.getElementById("devices-tbody");
     tbody.innerHTML = data.map(d => `
         <tr>
             <td style="font-family:monospace; color:var(--accent);">${d.device_id}</td>
             <td><span class="status-badge ${d.active ? 'status-active' : 'status-inactive'}">${d.active ? 'Active' : 'Suspended'}</span></td>
             <td style="color:#fbbf24; font-weight:700;">${d.token_balance}</td>
-            <td style="color:var(--muted);">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
+            <td style="color:var(--muted);">${d.created_at ? new Date(d.created_at).toLocaleString() : 'Never'}</td>
             <td>
                 <button class="secondary" onclick="updateBalance('${d.device_id}', 'add')">+</button>
                 <button class="danger" onclick="updateBalance('${d.device_id}', 'sub')">-</button>
@@ -101,6 +122,10 @@ async function load() {
             </td>
         </tr>
     `).join('');
+
+    // Update Stats and Chart
+    document.getElementById("stat-revenue").textContent = (analytics.revenue || 0).toLocaleString();
+    initChart(analytics.growth_data);
 }
 
 async function updateBalance(id, action) {

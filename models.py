@@ -10,4 +10,4 @@ class Device(Base):
     active = Column(Boolean, default=True)
 
     # Use server_default=func.now() for database-generated timestamps
-    last_seen = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, server_default=func.now())

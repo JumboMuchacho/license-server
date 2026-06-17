@@ -54,7 +54,7 @@ def upgrade() -> None:
     op.alter_column('devices', 'device_id',
                existing_type=sa.VARCHAR(),
                nullable=True)
-    op.alter_column('devices', 'last_seen',
+    op.alter_column('devices', 'created_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
                type_=sa.DateTime(),
                existing_nullable=True,
@@ -84,7 +84,7 @@ def downgrade() -> None:
                existing_server_default=sa.text("'[]'::jsonb"))
     op.create_unique_constraint(op.f('unique_device_id'), 'devices', ['device_id'], postgresql_nulls_not_distinct=False)
     op.create_index(op.f('ix_devices_id'), 'devices', ['id'], unique=False)
-    op.alter_column('devices', 'last_seen',
+    op.alter_column('devices', 'created_at',
                existing_type=sa.DateTime(),
                type_=postgresql.TIMESTAMP(timezone=True),
                existing_nullable=True,

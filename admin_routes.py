@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database import get_db
 import models
 from pydantic import BaseModel
@@ -21,7 +22,7 @@ def get_all_devices(db: Session = Depends(get_db)):
             "device_id": d.device_id,
             "active": d.active,
             "token_balance": d.token_balance,
-            "last_seen": d.last_seen.isoformat() if d.last_seen else None
+            "created_at": d.created_at.isoformat() if d.created_at else None
         } for d in devices
     ]
 
@@ -54,13 +55,23 @@ def delete_device(device_id: str, db: Session = Depends(get_db)):
 
 @router.get("/analytics")
 async def get_analytics(db: Session = Depends(get_db)):
-    # Calculate totals
+    # Calculate existing totals
     total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
     total_txns = db.query(MpesaTransaction).count()
     success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
 
+    # New: Query device registrations grouped by date
+    growth = db.query(
+        func.date(models.Device.created_at).label("date"),
+        func.count(models.Device.id).label("count")
+    ).group_by(func.date(models.Device.created_at)).order_by(func.date(models.Device.created_at)).all()
+
     return {
         "revenue": total_revenue,
         "total_txns": total_txns,
-        "success_rate": success_rate
+        "success_rate": success_rate,
+        "growth_data": {
+            "labels": [str(g.date) for g in growth],
+            "values": [g.count for g in growth]
+        }
     }
