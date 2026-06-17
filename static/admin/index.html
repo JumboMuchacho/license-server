@@ -99,12 +99,21 @@ function initChart(data) {
 }
 
 async function load() {
-    // Fetch Devices
-    const r = await fetch("/admin/devices", { headers: await getHeaders() });
-    const data = await r.json();
+    const headers = await getHeaders();
 
-    // Fetch Analytics (Growth)
-    const analyticsRes = await fetch("/admin/analytics", { headers: await getHeaders() });
+    // Fetch both simultaneously
+    const [devicesRes, analyticsRes] = await Promise.all([
+        fetch("/admin/devices", { headers }),
+        fetch("/admin/analytics", { headers })
+    ]);
+
+    // Check if the server actually returned data
+    if (!devicesRes.ok || !analyticsRes.ok) {
+        console.error("Fetch failed", devicesRes.status, analyticsRes.status);
+        return;
+    }
+
+    const data = await devicesRes.json();
     const analytics = await analyticsRes.json();
 
     // Render Table
@@ -125,7 +134,12 @@ async function load() {
 
     // Update Stats and Chart
     document.getElementById("stat-revenue").textContent = (analytics.revenue || 0).toLocaleString();
-    initChart(analytics.growth_data);
+    document.getElementById("stat-txns").textContent = (analytics.total_txns || 0).toLocaleString();
+
+    // Add safety check before initializing chart
+    if (analytics.growth_data && analytics.growth_data.labels) {
+        initChart(analytics.growth_data);
+    }
 }
 
 async function updateBalance(id, action) {
