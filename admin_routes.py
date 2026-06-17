@@ -25,20 +25,22 @@ def get_all_devices(db: Session = Depends(get_db)):
         } for d in devices
     ]
 
-@router.patch("/{device_id}")
-def update_device(device_id: str, payload: DeviceUpdate, db: Session = Depends(get_db)):
-    """Update device status or force token adjustments."""
+# Assuming you have a Pydantic model for this; if not, use a dict
+@router.patch("/devices/{device_id}")
+async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
 
-    if payload.active is not None:
-        device.active = payload.active
-    if payload.token_balance is not None:
-        device.token_balance = payload.token_balance
+    # Check if adjustment is provided (handles + and -)
+    adjustment = body.get("token_adjustment", 0)
+
+    # Calculate new balance, preventing it from going below zero
+    new_balance = max(0, device.token_balance + adjustment)
+    device.token_balance = new_balance
 
     db.commit()
-    return {"status": "success"}
+    return {"new_balance": device.token_balance}
 
 @router.delete("/{device_id}")
 def delete_device(device_id: str, db: Session = Depends(get_db)):

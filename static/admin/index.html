@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard | Device Management</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root { --bg:#0f172a; --card:#1e293b; --border:#334155; --text:#f1f5f9; --muted:#94a3b8; --accent:#6366f1; --danger:#ef4444; }
@@ -53,6 +54,11 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
     </div>
 
     <div class="card">
+        <h3>Device Growth</h3>
+        <canvas id="growthChart" height="100"></canvas>
+    </div>
+
+    <div class="card">
         <table>
             <thead>
                 <tr>
@@ -70,7 +76,7 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
 
 <script>
 const SB_URL="https://hcjjyokagkgeqwqjexsf.supabase.co";
-const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhjamp5b2thZ2tnZXF3cWpleHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNDE5NzAsImV4cCI6MjA5NjkxNzk3MH0.Z05WVKI9mH2BBkTLoPky2pLK2Uuijqz2FCi436NgNJU";
+const SB_KEY="YOUR_KEY_HERE";
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 
 async function getHeaders() {
@@ -78,26 +84,10 @@ async function getHeaders() {
     return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
 }
 
-async function loadAnalytics() {
-    try {
-        const res = await fetch("/admin/analytics", { headers: await getHeaders() });
-        const data = await res.json();
-        document.getElementById("stat-revenue").textContent = (data.revenue || 0).toLocaleString();
-        document.getElementById("stat-txns").textContent = data.total_txns || 0;
-        document.getElementById("stat-success").textContent = data.total_txns > 0
-            ? Math.round((data.success_rate / data.total_txns) * 100) + "%"
-            : "0%";
-    } catch (e) { console.error("Analytics fetch failed"); }
-}
-
 async function load() {
-    // Run both calls
-    await loadAnalytics();
-
     const r = await fetch("/admin/devices", { headers: await getHeaders() });
     const data = await r.json();
     const tbody = document.getElementById("devices-tbody");
-
     tbody.innerHTML = data.map(d => `
         <tr>
             <td style="font-family:monospace; color:var(--accent);">${d.device_id}</td>
@@ -105,20 +95,22 @@ async function load() {
             <td style="color:#fbbf24; font-weight:700;">${d.token_balance}</td>
             <td style="color:var(--muted);">${d.last_seen ? new Date(d.last_seen).toLocaleString() : 'Never'}</td>
             <td>
-                <button class="secondary" onclick="updateBalance('${d.device_id}')">Add Tokens</button>
+                <button class="secondary" onclick="updateBalance('${d.device_id}', 'add')">+</button>
+                <button class="danger" onclick="updateBalance('${d.device_id}', 'sub')">-</button>
                 <button class="danger" onclick="deleteDevice('${d.device_id}')">Delete</button>
             </td>
         </tr>
     `).join('');
 }
 
-async function updateBalance(id) {
-    const amount = prompt("Enter tokens to add:");
+async function updateBalance(id, action) {
+    const amount = prompt("Enter token amount:");
     if (!amount) return;
+    const val = action === 'sub' ? -parseInt(amount) : parseInt(amount);
     await fetch(`/admin/devices/${id}`, {
         method: "PATCH",
         headers: await getHeaders(),
-        body: JSON.stringify({ token_balance: parseInt(amount) })
+        body: JSON.stringify({ token_adjustment: val })
     });
     load();
 }
