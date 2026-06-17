@@ -1,11 +1,13 @@
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 import models
+from billing import MpesaTransaction
 from pydantic import BaseModel
+from security import verify_oauth  # Import the fix
 
 router = APIRouter(prefix="/admin/devices", tags=["Admin"])
 
@@ -15,52 +17,42 @@ class DeviceUpdate(BaseModel):
 
 @router.get("")
 def get_all_devices(db: Session = Depends(get_db)):
-    """Fetch all devices and their status."""
     devices = db.query(models.Device).all()
     return [
         {
             "device_id": d.device_id,
             "active": d.active,
             "token_balance": d.token_balance,
-            "created_at": d.created_at.isoformat() if d.created_at else None
+            "created_at": d.created_at.isoformat() if hasattr(d, 'created_at') and d.created_at else None
         } for d in devices
     ]
 
-# Assuming you have a Pydantic model for this; if not, use a dict
-@router.patch("/devices/{device_id}")
+@router.patch("/{device_id}")
 async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
 
-    # Check if adjustment is provided (handles + and -)
     adjustment = body.get("token_adjustment", 0)
-
-    # Calculate new balance, preventing it from going below zero
-    new_balance = max(0, device.token_balance + adjustment)
-    device.token_balance = new_balance
-
+    device.token_balance = max(0, device.token_balance + adjustment)
     db.commit()
     return {"new_balance": device.token_balance}
 
 @router.delete("/{device_id}")
-def delete_device(device_id: str, db: Session = Depends(get_db)):
-    """Remove a device registration."""
+def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if device:
         db.delete(device)
         db.commit()
     return {"status": "deleted"}
 
-
 @router.get("/analytics")
-async def get_analytics(db: Session = Depends(get_db)):
-    # Calculate existing totals
-    total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
-    total_txns = db.query(MpesaTransaction).count()
-    success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
+async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
+    # Ensure MpesaTransaction is imported from models
+    total_revenue = db.query(func.sum(models.MpesaTransaction.amount)).filter(models.MpesaTransaction.status == "SUCCESS").scalar() or 0
+    total_txns = db.query(models.MpesaTransaction).count()
+    success_rate = db.query(models.MpesaTransaction).filter(models.MpesaTransaction.status == "SUCCESS").count()
 
-    # New: Query device registrations grouped by date
     growth = db.query(
         func.date(models.Device.created_at).label("date"),
         func.count(models.Device.id).label("count")
