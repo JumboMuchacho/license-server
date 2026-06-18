@@ -103,7 +103,7 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
     db.commit()
     return {"status": "success", "device_id": device.device_id, "token_balance": device.token_balance}
 
-@@app.get("/api/v1/status")
+@app.get("/api/v1/status")
 def get_device_status(device_id: str, db: Session = Depends(get_db)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
 
