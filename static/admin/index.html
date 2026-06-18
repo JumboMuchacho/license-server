@@ -98,6 +98,17 @@ function initChart(data) {
     });
 }
 
+async function resetProduction() {
+    if (!confirm("WARNING: This will wipe all transaction history and reset all user balances. Proceed?")) return;
+
+    await fetch("/admin/reset-analytics", {
+        method: "POST",
+        headers: await getHeaders()
+    });
+    alert("Production reset complete.");
+    load(); // Refresh your dashboard
+}
+
 async function load() {
     const headers = await getHeaders();
 

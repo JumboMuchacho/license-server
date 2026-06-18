@@ -103,13 +103,15 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
     db.commit()
     return {"status": "success", "device_id": device.device_id, "token_balance": device.token_balance}
 
-@app.get("/api/v1/status")
+@@app.get("/api/v1/status")
 def get_device_status(device_id: str, db: Session = Depends(get_db)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
-    return {"token_balance": device.token_balance, "is_active": device.token_balance > 0}
 
+    # If device not found, return default values instead of raising 404
+    if not device:
+        return {"token_balance": 0, "is_active": False}
+
+    return {"token_balance": device.token_balance, "is_active": device.token_balance > 0}
 @app.post("/api/v1/rules")
 @limiter.limit("200/minute")
 def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(...), db: Session = Depends(get_db)):

@@ -68,3 +68,19 @@ async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oaut
             "values": [g.count for g in growth]
         }
     }
+
+# Add to admin_routes.py
+@router.post("/reset-analytics")
+async def reset_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
+    try:
+        # 1. Delete all transactions
+        db.query(MpesaTransaction).delete()
+
+        # 2. Reset all device balances to 0
+        db.query(models.Device).update({"token_balance": 0})
+
+        db.commit()
+        return {"status": "success", "message": "All analytics and balances have been reset."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
