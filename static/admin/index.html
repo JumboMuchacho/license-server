@@ -33,11 +33,14 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
 </div>
 
 <div id="admin-panel" style="display:none; max-width:1000px; margin:auto;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1>Device Registry</h1>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <h1>Device Registry</h1>
+
+    <div>
+        <button class="danger" onclick="resetProduction()" style="margin-right: 10px;">RESET ALL DATA</button>
         <button class="secondary" onclick="logout()">Logout</button>
     </div>
-
+</div>
     <div class="analytics-grid">
         <div class="card stat-box">
             <label>Total Revenue (KES)</label>
@@ -98,17 +101,25 @@ function initChart(data) {
     });
 }
 
+// Ensure this function is available in your <script> section
 async function resetProduction() {
+    // 1. Confirm action
     if (!confirm("WARNING: This will wipe all transaction history and reset all user balances. Proceed?")) return;
 
-    await fetch("/admin/reset-analytics", {
+    // 2. Fetch the endpoint
+    const response = await fetch("/admin/reset-analytics", {
         method: "POST",
-        headers: await getHeaders()
+        headers: await getHeaders() // This pulls your Auth token
     });
-    alert("Production reset complete.");
-    load(); // Refresh your dashboard
-}
 
+    // 3. Handle result
+    if (response.ok) {
+        alert("Production reset complete.");
+        load(); // Refresh dashboard
+    } else {
+        alert("Reset failed. Check server logs.");
+    }
+}
 async function load() {
     const headers = await getHeaders();
 
