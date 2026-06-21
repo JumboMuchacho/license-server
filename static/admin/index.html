@@ -81,8 +81,10 @@ let growthChart;
 async function initAdmin() {
     const configRes = await fetch("/admin/config");
     if (!configRes.ok) {
+        const errorText = await configRes.text();
+        console.error("Config fetch failed:", errorText);
         document.getElementById("login-section").innerHTML =
-            "<h2>Admin Access</h2><p>Admin auth is not configured on the server.</p>";
+            `<h2>Admin Access</h2><p>Error: ${configRes.status} - ${errorText}</p>`;
         return;
     }
     const config = await configRes.json();
