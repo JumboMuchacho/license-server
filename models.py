@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func # Import func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, func  # Import func
 from database import Base
+from typing import Any
 
-class Device(Base):
+
+class Device(Base):  # type: ignore[valid-type, misc]
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True)

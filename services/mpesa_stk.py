@@ -1,24 +1,29 @@
-import os
-import httpx
 import base64
+import os
 from datetime import datetime
 
-def trigger_stk_push(db, phone_number: str, amount: int, account_reference: str, access_token: str):
-    """
-    Builds payload and triggers STK Push to Safaricom.
-    Matches the arguments: (db, phone_number, amount, account_reference, access_token)
-    """
-    url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+import httpx
+
+
+def _mpesa_base_url() -> str:
+    return os.getenv("MPESA_BASE_URL", "https://sandbox.safaricom.co.ke").rstrip("/")
+
+
+def trigger_stk_push(
+    db, phone_number: str, amount: int, account_reference: str, access_token: str
+):
+    url = f"{_mpesa_base_url()}/mpesa/stkpush/v1/processrequest"
 
     shortcode = os.getenv("MPESA_SHORTCODE")
     passkey = os.getenv("MPESA_PASSKEY")
     callback_url = os.getenv("MPESA_CALLBACK_URL")
 
-    # 1. Prepare Timestamp and Password
+    if not shortcode or not passkey or not callback_url:
+        raise ValueError("M-Pesa STK configuration is incomplete.")
+
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     password = base64.b64encode(f"{shortcode}{passkey}{timestamp}".encode()).decode()
 
-    # 2. Build Payload
     payload = {
         "BusinessShortCode": shortcode,
         "Password": password,
@@ -30,17 +35,13 @@ def trigger_stk_push(db, phone_number: str, amount: int, account_reference: str,
         "PhoneNumber": str(phone_number),
         "CallBackURL": callback_url,
         "AccountReference": account_reference,
-        "TransactionDesc": "Taptap Topup"
+        "TransactionDesc": "Taptap Token Topup",
     }
 
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
-    # 3. Trigger Request
-    # Using httpx to match your FastAPI environment
-    with httpx.Client() as client:
-        response = client.post(url, json=payload, headers=headers)
-
-    return response
+    with httpx.Client(timeout=30.0) as client:
+        return client.post(url, json=payload, headers=headers)

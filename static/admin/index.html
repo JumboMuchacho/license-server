@@ -75,14 +75,31 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
 </div>
 
 <script>
-const SB_URL="https://hcjjyokagkgeqwqjexsf.supabase.co";
-const SB_KEY="sb_publishable_z4w1eemmXmOITtVPcypWxA_ZyxIZMme";
-const _supabase = supabase.createClient(SB_URL, SB_KEY);
-let growthChart; // Global variable to hold the chart instance
+let _supabase;
+let growthChart;
+
+async function initAdmin() {
+    const configRes = await fetch("/admin/config");
+    if (!configRes.ok) {
+        document.getElementById("login-section").innerHTML =
+            "<h2>Admin Access</h2><p>Admin auth is not configured on the server.</p>";
+        return;
+    }
+    const config = await configRes.json();
+    _supabase = supabase.createClient(config.supabase_url, config.supabase_anon_key);
+
+    _supabase.auth.onAuthStateChange((event, session) => {
+        if (session) {
+            document.getElementById("login-section").style.display = "none";
+            document.getElementById("admin-panel").style.display = "block";
+            load();
+        }
+    });
+}
 
 async function getHeaders() {
-    const {data:{session}} = await _supabase.auth.getSession();
-    return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
+    const { data: { session } } = await _supabase.auth.getSession();
+    return { Authorization: `Bearer ${session?.access_token}`, "Content-Type": "application/json" };
 }
 
 // 1. Initialize Chart
@@ -175,13 +192,7 @@ async function deleteDevice(id) {
 async function login() { await _supabase.auth.signInWithOAuth({ provider: "google" }); }
 async function logout() { await _supabase.auth.signOut(); location.reload(); }
 
-_supabase.auth.onAuthStateChange((e, s) => {
-    if (s) {
-        document.getElementById("login-section").style.display = "none";
-        document.getElementById("admin-panel").style.display = "block";
-        load();
-    }
-});
+initAdmin();
 </script>
 </body>
 </html>

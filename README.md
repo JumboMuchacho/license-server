@@ -1,118 +1,133 @@
-# 🛡️ License-server: Backend Control Plane
-
-![Security Scan](https://img.shields.io/badge/Security-Authenticated-red.svg)
+# 🛡️ Taptap Backend Server
+![Security Scan](https://img.shields.io/badge/Security-Authenticated-red.
+svg)
 ![FastAPI](https://img.shields.io/badge/Framework-FastAPI-009688.svg)
 ![Supabase](https://img.shields.io/badge/Auth-Supabase-3ECF8E.svg)
 
-A production-grade **FastAPI** backend designed for high-security software entitlement. This system serves as the central authority for cryptographic license verification, multi-device orchestration, and administrative lifecycle management via a secure **Zero-Trust** control plane.
-
-
+FastAPI backend for the **Taptap Chrome extension**: device registration, token billing, M-Pesa top-ups, XPath rule delivery, and an admin control plane.
 
 ---
 
-## 🏗️ System Architecture
-
-The server acts as the "Single Source of Truth," utilizing a multi-layered security approach to prevent unauthorized access and license spoofing.
-### Server responsibilities
-- License validation
-- Update manifest generation
-- Mandatory update enforcement
-- Admin UI toggles versions / uploads zips
-
-### 1. The Security Layer
-- **PBKDF2 Key Derivation:** To mitigate "Global Secret" vulnerabilities, the server derives unique, per-device HMAC keys using **100,000 iterations** of PBKDF2 with a unique cryptographic salt.
-- **HMAC-SHA256 Signing:** Ensures all issued tokens are tamper-proof and cryptographically bound to the client's hardware fingerprint.
-- **Identity Proxy:** Administrative routes are secured via **Supabase Service Role** verification, ensuring only whitelisted engineer emails can modify license data.
-
-### 2. The Logic Engine
-- **Sticky Device Binding:** Automatically handles registration and enforces strict `max_devices` concurrency limits.
-- **Migration Logic:** Features intelligent handling for hardware upgrades; permits device migration only if the previous license association is verified as inactive or expired.
-- **Stateless Verification:** Issues signed tokens for offline client resiliency while maintaining centralized revocation control.
-
----
-
-## 🔐 Production Auth Flow (Admin UI)
-
-The administration panel implements a modern **Zero-Trust** authentication architecture:
-
-1.  **Identity Provider:** Admin authenticates via **Google OAuth** through the Supabase JS client.
-2.  **Token Exchange:** The Admin UI captures the `access_token` and includes it in the `Authorization: Bearer` header for all API calls.
-3.  **FastAPI Middleware:** The server proxies the JWT to Supabase’s `/auth/v1/user` endpoint for real-time validation.
-4.  **Authorization:** The server cross-references the authenticated email against a restricted `ADMIN_EMAILS` whitelist before granting access to CRUD operations.
-
-
-
----
-
-## 📂 Project Structure
+## Architecture
 
 ```text
-.
-├── main.py            # API Gateway & Uvicorn entry point
-├── models.py          # SQLAlchemy relational schema (Licenses/Devices)
-├── security.py        # PBKDF2 & HMAC cryptographic functions
-├── auth.py            # Supabase JWT & Whitelist middleware
-├── admin_routes.py    # RESTful License CRUD logic
-├── database.py        # PostgreSQL connection pooling & session management
-└── static/admin       # Secure Admin UI (HTML/JS)
+Chrome Extension (MV3)
+  ├── background.js   → HMAC-signed API calls, dynamic content-script registration
+  ├── content.js      → DOM monitoring + token consumption triggers
+  └── popup.js        → Balance UI + M-Pesa STK initiation
 
+license-server (FastAPI)
+  ├── main.py           → Client API (register, status, rules, consume)
+  ├── billing_routes.py → M-Pesa STK + Safaricom callback
+  ├── admin_routes.py   → Device CRUD + analytics (Supabase OAuth)
+  ├── security.py       → PBKDF2 + HMAC request authentication
+  └── auth.py           → Supabase JWT validation + admin email whitelist
 ```
 
----
+### 🛡️ Security model
 
-## 🛠️ API Reference
-### Client Verification
-**`POST /verify`**
+| Actor | Authentication | Notes |
+|-------|----------------|-------|
+| Extension client | HMAC-SHA256 (`X-Auth-Token`) + 5-minute timestamp window | Per-device key derived via PBKDF2 |
+| Admin UI | Supabase Google OAuth + `ADMIN_EMAILS` whitelist | Bearer JWT validated server-side |
+| M-Pesa callback | Safaricom IP allowlist | Optional dev bypass via env |
 
-* **Intent:** Validates hardware integrity and current license status.
-* **Logic:** Executes a server-side check of expiration dates, activation status, and device affinity (binding).
-* **Response:** Returns a cryptographically signed payload containing the session signature and an expiry timestamp (`exp`).
-
----
-
-### Admin Management (Protected)
-*These endpoints require a valid Supabase JWT and admin whitelist clearance.*
-
-* **`GET /admin/licenses`** Retrieves a comprehensive list of all issued keys alongside real-time device telemetry and activation counts.
-
-* **`POST /admin/licenses`** Generates and issues new 16-character dashed license keys with configurable device limits.
-
-* **`DELETE /admin/licenses/{key}`** Triggers immediate global revocation of entitlements for a specific key, instantly deauthorizing all associated devices.
+All client endpoints require signed requests except `/health` and `/admin/config` (public Supabase anon key only).
 
 ---
 
-## 📦 Deployment & Setup
-
-### Environment Configuration (`.env`)
-
-To ensure the system operates correctly, create a `.env` file in the root directory with the following variables:
+## 🔐 Environment variables
 
 ```env
-# Security
-LICENSE_SECRET=your_pbkdf2_derivation_secret
+# Core
+ENV=production
+SECRET_SALT=your_shared_pbkdf2_salt
+DATABASE_URL=postgresql://...
 
-# Database
-DATABASE_URL=postgresql://user:pass@host:port/db
-
-# Supabase Auth
-SUPABASE_URL=your_project_url
+# Admin auth
+SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_KEY=your_service_role_key
-ADMIN_EMAILS=admin@example.com,dev@example.com
+SUPABASE_ANON_KEY=your_anon_key
+ADMIN_EMAILS=admin@example.com
+
+# CORS (comma-separated; extension fetch bypasses CORS via host_permissions)
+ALLOWED_ORIGINS=https://origin address...
+
+# Client config
+CONTENT_SCRIPT_MATCHES=https://your-target-site.com/*,http://localhost/*
+DETECTION_RULES="Your custom detection Rules//"]
+
+# M-Pesa
+MPESA_BASE_URL=https://api.safaricom.co.ke
+MPESA_CONSUMER_KEY=
+MPESA_CONSUMER_SECRET=
+MPESA_SHORTCODE=
+MPESA_PASSKEY=
+MPESA_CALLBACK_URL=https://your-server.url.com/api/v1/mpesa/callback
+# MPESA_CALLBACK_EXTRA_IPS=1.2.3.4   # dev only
+# MPESA_SKIP_IP_VERIFY=true          # local testing only
 ```
 
 ---
 
-### 🚀Launching the Instance
+## 🛠️ API reference
 
-For local development or production VPS environments, use **Uvicorn** for a high-performance ASGI server:
+### Client (signed)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/v1/register` | Register or refresh a device |
+| `POST` | `/api/v1/status` | Read token balance |
+| `POST` | `/api/v1/config` | Return allowed content-script URL patterns |
+| `POST` | `/api/v1/rules` | Return XPath rules (requires balance > 0) |
+| `POST` | `/api/v1/billing/consume-token` | Decrement balance by 1 |
+| `POST` | `/api/v1/mpesa/stkpush` | Initiate M-Pesa STK push |
+
+**Signature:** `HMAC-SHA256(PBKDF2(device_id, SECRET_SALT), "{device_id}:{timestamp}")` sent as `X-Auth-Token`.
+
+### Admin (Bearer JWT)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/admin/devices` | List devices |
+| `PATCH` | `/admin/devices/{id}` | Adjust token balance |
+| `DELETE` | `/admin/devices/{id}` | Delete device |
+| `GET` | `/admin/analytics` | Revenue and growth stats |
+| `POST` | `/admin/reset-analytics` | Wipe transactions and zero balances |
+
+---
+
+## 📦 Deployment checklist
+
+1. Set all env vars (especially `SECRET_SALT`, `ADMIN_EMAILS`, `DATABASE_URL_*`).
+2. Set `MPESA_BASE_URL=https://api.safaricom.co.ke` for production M-Pesa.
+3. Set `CONTENT_SCRIPT_MATCHES` to your production target domain(s).
+4. Add the production target domain to the extension `manifest.json` `host_permissions` before Chrome Web Store submission.
+5. Ensure `SECRET_SALT` in env vars matches the salt baked into the extension build.
+6. Remove `MPESA_SKIP_IP_VERIFY` and test IPs from production.
+
+---
+
+## 🏗️ Local development
 
 ```bash
-# Optimized for Production (Render/VPS)
-uvicorn main:app --host 0.0.0.0 --port 10000
----
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 10000
 ```
 
-## 📞 Support & Maintenance
+Open `/admin-ui` for the dashboard. API docs are available at `/docs` when `ENV` is not `production`.
+
+---
+
+## Extension integration notes
+
+- The extension registers content scripts dynamically via `/api/v1/config` instead of injecting on all URLs.
+- Balance polling goes through the background service worker (`GET_STATUS` message), not direct unauthenticated HTTP.
+- On install/update, the extension signs and calls `/api/v1/register` automatically.
+
+---
+
+## Support
 
 - **Lead Developer:** Job brian
-- **Status:** 🟢 Active Maintenance / Production Ready
+- **Status:** Active maintenance

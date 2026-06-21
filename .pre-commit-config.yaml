@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
@@ -16,8 +16,24 @@ repos:
 
   # Security: Runs Bandit SAST scanner on your backend files
   - repo: https://github.com/pycqa/bandit
-    rev: 1.7.8
+    rev: 1.9.4
     hooks:
       - id: bandit
         args: ["-r", "-lll"]
         exclude: ^venv/
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+     - id: black
+
+ # - repo: https://github.com/astral-sh/ruff
+  #  rev: v0.15.18
+   ##  - id: ruff
+     #   args: [--fix, --exit-non-zero-on-fix]
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+       - id: mypy
+         args: [--ignore-missing-imports]

@@ -7,14 +7,16 @@ from database import get_db
 import models
 from billing import MpesaTransaction
 from pydantic import BaseModel
-from security import verify_oauth
+from auth import verify_oauth
 
 # Route prefix set to match your frontend calls
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
+
 class DeviceUpdate(BaseModel):
     active: Optional[bool] = None
     token_balance: Optional[int] = None
+
 
 @router.get("/devices")
 def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
@@ -24,13 +26,26 @@ def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
             "device_id": d.device_id,
             "active": d.active,
             "token_balance": d.token_balance,
-            "created_at": d.created_at.isoformat() if hasattr(d, 'created_at') and d.created_at else None
-        } for d in devices
+            "created_at": (
+                d.created_at.isoformat()
+                if hasattr(d, "created_at") and d.created_at
+                else None
+            ),
+        }
+        for d in devices
     ]
 
+
 @router.patch("/devices/{device_id}")
-async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
-    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+async def update_device_tokens(
+    device_id: str,
+    body: dict,
+    db: Session = Depends(get_db),
+    admin=Depends(verify_oauth),
+):
+    device = (
+        db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    )
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
 
@@ -39,25 +54,43 @@ async def update_device_tokens(device_id: str, body: dict, db: Session = Depends
     db.commit()
     return {"new_balance": device.token_balance}
 
+
 @router.delete("/devices/{device_id}")
-def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
-    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+def delete_device(
+    device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)
+):
+    device = (
+        db.query(models.Device).filter(models.Device.device_id == device_id).first()
+    )
     if device:
         db.delete(device)
         db.commit()
     return {"status": "deleted"}
 
+
 @router.get("/analytics")
 async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     # Using imported MpesaTransaction directly
-    total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
+    total_revenue = (
+        db.query(func.sum(MpesaTransaction.amount))
+        .filter(MpesaTransaction.status == "SUCCESS")
+        .scalar()
+        or 0
+    )
     total_txns = db.query(MpesaTransaction).count()
-    success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
+    success_rate = (
+        db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
+    )
 
-    growth = db.query(
-        func.date(models.Device.created_at).label("date"),
-        func.count(models.Device.id).label("count")
-    ).group_by(func.date(models.Device.created_at)).order_by(func.date(models.Device.created_at)).all()
+    growth = (
+        db.query(
+            func.date(models.Device.created_at).label("date"),
+            func.count(models.Device.id).label("count"),
+        )
+        .group_by(func.date(models.Device.created_at))
+        .order_by(func.date(models.Device.created_at))
+        .all()
+    )
 
     return {
         "revenue": total_revenue,
@@ -65,9 +98,10 @@ async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oaut
         "success_rate": success_rate,
         "growth_data": {
             "labels": [str(g.date) for g in growth],
-            "values": [g.count for g in growth]
-        }
+            "values": [g.count for g in growth],
+        },
     }
+
 
 # Add to admin_routes.py
 @router.post("/reset-analytics")
@@ -80,7 +114,10 @@ async def reset_analytics(db: Session = Depends(get_db), admin=Depends(verify_oa
         db.query(models.Device).update({"token_balance": 0})
 
         db.commit()
-        return {"status": "success", "message": "All analytics and balances have been reset."}
+        return {
+            "status": "success",
+            "message": "All analytics and balances have been reset.",
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
