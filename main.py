@@ -17,6 +17,7 @@ from slowapi.errors import RateLimitExceeded
 # --- Project Modules ---
 from database import engine, get_db, init_db
 import models
+from billing import MpesaTransaction  # <-- Added missing import here
 from admin_routes import router as admin_router
 from billing_routes import router as billing_router
 from security import verify_raw_signature, sign_payload
@@ -107,11 +108,31 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
 def get_device_status(device_id: str, db: Session = Depends(get_db)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
 
-    # If device not found, return default values instead of raising 404
+    # If device not found, return default failure values
     if not device:
-        return {"token_balance": 0, "is_active": False}
+        return {
+            "token_balance": 0,
+            "is_active": False,
+            "latest_payment_status": "NONE"
+        }
 
-    return {"token_balance": device.token_balance, "is_active": device.token_balance > 0}
+    # Fetch the absolute latest M-Pesa transaction for this specific device
+    latest_txn = db.query(MpesaTransaction)\
+        .filter(MpesaTransaction.device_id == device_id)\
+        .order_by(MpesaTransaction.created_at.desc())\
+        .first()
+
+    # Default to NONE if they have never initiated a payment record
+    payment_status = "NONE"
+    if latest_txn:
+        payment_status = latest_txn.status  # Will be "PENDING", "SUCCESS", or "FAILED"
+
+    return {
+        "token_balance": device.token_balance,
+        "is_active": device.token_balance > 0,
+        "latest_payment_status": payment_status  # <-- The device frontend reads this to kill the loop
+    }
+
 @app.post("/api/v1/rules")
 @limiter.limit("200/minute")
 def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
