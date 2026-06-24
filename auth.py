@@ -5,13 +5,13 @@ from fastapi.security import HTTPBearer
 
 oauth_scheme = HTTPBearer()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 # IMPORTANT: This MUST be the 'service_role' key from Supabase settings
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 
 def verify_oauth(token=Security(oauth_scheme)) -> dict:
-    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    if not DATABASE_URL or not SUPABASE_SERVICE_KEY:
         raise HTTPException(status_code=500, detail="Supabase config missing")
 
     headers = {
@@ -21,7 +21,7 @@ def verify_oauth(token=Security(oauth_scheme)) -> dict:
 
     try:
         resp = requests.get(
-            f"{SUPABASE_URL.rstrip('/')}/auth/v1/user",
+            f"{DATABASE_URL.rstrip('/')}/auth/v1/user",
             headers=headers,
             timeout=10,
         )
