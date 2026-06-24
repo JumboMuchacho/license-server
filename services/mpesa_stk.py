@@ -3,10 +3,10 @@ import httpx
 import base64
 from datetime import datetime
 
-def trigger_stk_push(db, phone_number: str, amount: int, account_reference: str, access_token: str):
+# Make this function async
+async def trigger_stk_push(db, phone_number: str, amount: int, account_reference: str, access_token: str):
     """
-    Builds payload and triggers STK Push to Safaricom.
-    Matches the arguments: (db, phone_number, amount, account_reference, access_token)
+    Builds payload and triggers STK Push to Safaricom asynchronously.
     """
     url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
 
@@ -38,9 +38,8 @@ def trigger_stk_push(db, phone_number: str, amount: int, account_reference: str,
         "Content-Type": "application/json"
     }
 
-    # 3. Trigger Request
-    # Using httpx to match your FastAPI environment
-    with httpx.Client() as client:
-        response = client.post(url, json=payload, headers=headers)
+    # 3. Trigger Request with an explicit 30-second timeout
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=payload, headers=headers, timeout=30.0)
 
     return response

@@ -65,7 +65,7 @@ async def initiate_stk_push(
     access_token = get_mpesa_access_token()
     print(f"DEBUG: Triggering STK for {body.phone_number} with token {access_token[:10]}...")
 
-    response = trigger_stk_push(
+    response = await trigger_stk_push(
         db=db,
         phone_number=body.phone_number,
         amount=body.amount,
