@@ -9,6 +9,8 @@ from billing import MpesaTransaction
 from pydantic import BaseModel
 from auth import verify_oauth
 
+router = APIRouter(prefix="/admin", tags=["Admin"])
+
 class DeviceUpdate(BaseModel):
     active: Optional[bool] = None
     token_adjustment: Optional[int] = None
