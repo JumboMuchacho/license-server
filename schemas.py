@@ -7,7 +7,6 @@ class STKPushRequest(BaseModel):
     device_id: str
     phone_number: int
     amount: int
-    timestamp: int
 
 class ConsumeTokenRequest(BaseModel):
     device_id: str
