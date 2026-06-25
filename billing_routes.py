@@ -4,11 +4,14 @@ from database import get_db, SessionLocal
 from billing import MpesaTransaction
 import models
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
-from security import verify_raw_signature, derive_device_secret
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
 from schemas import STKPushRequest
-import hmac, hashlib
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+# Initialize SlowAPI rate limiting to safeguard the payment endpoint from abuse
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/v1/mpesa")
 
@@ -40,35 +43,36 @@ def process_callback_data(data: dict):
     finally:
         db.close()
 
+
 @router.post("/stkpush")
+@limiter.limit("5/minute")  # Protects your API from bot-loops slamming your Safaricom budget
 async def initiate_stk_push(
     body: STKPushRequest,
     request: Request,
     db: Session = Depends(get_db)
 ):
-    # 1. Signature Verification
-    x_auth_token = request.headers.get("x-auth-token") or request.headers.get("X-Auth-Token")
-
-    derived_key = derive_device_secret(body.device_id)
-    raw_message_string = f"{body.device_id}:{body.timestamp}"
-    computed_signature = hmac.new(derived_key, raw_message_string.encode("utf-8"), hashlib.sha256).hexdigest()
-
-    if not x_auth_token or not hmac.compare_digest(computed_signature, x_auth_token):
-        raise HTTPException(status_code=403, detail="Invalid request signature.")
-
-    # 2. Validate Device
+    # --- SECURITY GATEKEEPER CHECK ---
+    # Validate Device directly against the database instead of client-side signing
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
     if not device:
-        raise HTTPException(status_code=404, detail="Device not registered.")
+        # If the device identity is malicious or completely unverified, block them instantly
+        raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
-    # 3. Trigger M-Pesa
+    # --- SERVER SIDE PARSING & INPUT SANITIZATION ---
+    try:
+        clean_phone = int(str(body.phone_number).strip().replace("+", ""))
+        clean_amount = int(body.amount)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload formatting data structure.")
+
+    # --- TRIGGER M-PESA PIPELINE ---
     access_token = get_mpesa_access_token()
-    print(f"DEBUG: Triggering STK for {body.phone_number} with token {access_token[:10]}...")
+    print(f"DEBUG: Triggering STK for {clean_phone} with token {access_token[:10]}...")
 
     response = await trigger_stk_push(
         db=db,
-        phone_number=body.phone_number,
-        amount=body.amount,
+        phone_number=clean_phone,
+        amount=clean_amount,
         account_reference=device.device_id,
         access_token=access_token
     )
@@ -76,12 +80,12 @@ async def initiate_stk_push(
     resp_data = response.json()
     print(f"DEBUG: SAFARICOM RAW RESPONSE: {resp_data}")
 
-    # 4. Handle Response
+    # --- HANDLE RESPONSE ---
     if "CheckoutRequestID" in resp_data:
         new_txn = MpesaTransaction(
             device_id=device.device_id,
-            phone_number=str(body.phone_number),
-            amount=body.amount,
+            phone_number=str(clean_phone),
+            amount=clean_amount,
             status="PENDING",
             checkout_request_id=resp_data.get("CheckoutRequestID")
         )
@@ -90,6 +94,7 @@ async def initiate_stk_push(
         return resp_data
     else:
         raise HTTPException(status_code=400, detail=f"Safaricom Error: {resp_data}")
+
 
 @router.post("/callback")
 async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):

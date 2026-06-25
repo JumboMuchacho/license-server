@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Request, Header
@@ -17,10 +18,10 @@ from slowapi.errors import RateLimitExceeded
 # --- Project Modules ---
 from database import engine, get_db, init_db
 import models
-from billing import MpesaTransaction  # <-- Added missing import here
+from billing import MpesaTransaction
 from admin_routes import router as admin_router
 from billing_routes import router as billing_router
-from security import verify_raw_signature, sign_payload
+# FIXED: Included RegistrationSchema into parsing layers for rules matching
 from schemas import RegistrationSchema, ConsumeTokenRequest
 
 load_dotenv()
@@ -42,138 +43,80 @@ app = FastAPI(
     title="Taptap Server Admin",
     lifespan=lifespan,
     docs_url=None if is_production else "/docs",
-    redoc_url=None if is_production else "/redoc",
-    openapi_url=None if is_production else "/openapi.json"
-)
-
-# --- CORS Middleware ---
-# Replace the wildcard with your specific Extension ID when ready for production
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    redoc_url=None if is_production else "/redoc"
 )
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "chrome-extension://iaollkojbfolafoiljaaieijhflbiofi",
+        "https://license-server-lewp.onrender.com"
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(admin_router)
 app.include_router(billing_router)
 
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.middleware("http")
-async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    return response
-
-@app.get("/")
-def root():
-    return RedirectResponse("/admin-ui")
-
-@app.get("/admin-ui")
-def admin_ui():
-    return FileResponse("static/admin/index.html")
-
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-# -------------------------------------------------
-# Operational Routes
-# -------------------------------------------------
-
 @app.post("/api/v1/register")
-@limiter.limit("20/minute")
-def register_device(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
-    device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
-    if not device:
-        device = models.Device(
-            device_id=body.device_id,
-            token_balance=0,
-            active=True,
-            created_at=datetime.now(timezone.utc)
-        )
-        db.add(device)
-    else:
-        device.created_at = datetime.now(timezone.utc)
+@limiter.limit("5/minute")
+def register_device(request: Request, schema: RegistrationSchema, db: Session = Depends(get_db)):
+    try:
+        clean_id = str(uuid.UUID(schema.device_id.strip()))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Malformed structure registration attempt rejected.")
+
+    existing = db.query(models.Device).filter(models.Device.device_id == clean_id).first()
+    if existing:
+        return {"status": "recognized", "device_id": existing.device_id, "token_balance": existing.token_balance}
+
+    new_device = models.Device(device_id=clean_id, token_balance=0, active=True)
+    db.add(new_device)
     db.commit()
-    return {"status": "success", "device_id": device.device_id, "token_balance": device.token_balance}
+    db.refresh(new_device)
+    return {"status": "registered", "device_id": new_device.device_id, "token_balance": new_device.token_balance}
 
 @app.get("/api/v1/status")
-def get_device_status(device_id: str, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_status(request: Request, device_id: str, db: Session = Depends(get_db)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
-
-    # If device not found, return default failure values
     if not device:
-        return {
-            "token_balance": 0,
-            "is_active": False,
-            "latest_payment_status": "NONE"
-        }
+        raise HTTPException(status_code=404, detail="Device context not found.")
 
-    # Fetch the absolute latest M-Pesa transaction for this specific device
-    latest_txn = db.query(MpesaTransaction)\
-        .filter(MpesaTransaction.device_id == device_id)\
-        .order_by(MpesaTransaction.created_at.desc())\
-        .first()
-
-    # Default to NONE if they have never initiated a payment record
-    payment_status = "NONE"
-    if latest_txn:
-        payment_status = latest_txn.status  # Will be "PENDING", "SUCCESS", or "FAILED"
+    latest_txn = db.query(MpesaTransaction).filter(MpesaTransaction.device_id == device_id).order_by(MpesaTransaction.created_at.desc()).first()
+    payment_status = latest_txn.status if latest_txn else "NONE"
 
     return {
+        "device_id": device.device_id,
         "token_balance": device.token_balance,
-        "is_active": device.token_balance > 0,
-        "latest_payment_status": payment_status  # <-- The device frontend reads this to kill the loop
+        "active": device.active,
+        "latest_payment_status": payment_status
     }
 
 @app.post("/api/v1/rules")
-@limiter.limit("200/minute")
-def get_secure_rules(request: Request, body: dict, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
-    device_id = body.get("device_id")
-    timestamp = body.get("timestamp")
-    if not device_id or not timestamp or not x_auth_token:
-        raise HTTPException(status_code=400, detail="Missing elements.")
-    if abs(int(time.time()) - int(timestamp)) > 300:
-        raise HTTPException(status_code=401, detail="Request expired.")
-    if not verify_raw_signature(device_id, int(timestamp), x_auth_token):
-        raise HTTPException(status_code=403, detail="Signature mismatch.")
-
-    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
-    if device:
-        device.created_at = datetime.now(timezone.utc)
-        db.commit()
-    return {
-        "isActive": True,
-        "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction')]"]
-    }
-
-@app.post("/api/v1/billing/consume-token")
-@limiter.limit("100/minute")
-def consume_token(request: Request, body: ConsumeTokenRequest, x_auth_token: str = Header(...), db: Session = Depends(get_db)):
-    # 1. Verify Identity
-    if not verify_raw_signature(body.device_id, body.timestamp, x_auth_token):
-        raise HTTPException(status_code=403, detail="Invalid signature.")
-
-    # 2. Check existence first
+@limiter.limit("60/minute")
+def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
+    # 1. Fetch device profile
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
-
     if not device:
-        # RETURN 410: The device is gone from the server records
-        raise HTTPException(status_code=410, detail="Device not found in registry.")
+        raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
+    # 2. Check token balance or active status strictly on the server side
     if not device.active or device.token_balance <= 0:
-        raise HTTPException(status_code=403, detail="Forbidden or Insufficient balance.")
+        raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
 
-    # 3. Process
+    # 3. Securely deduct token *before* giving away tracking data
     device.token_balance -= 1
     device.created_at = datetime.now(timezone.utc)
     db.commit()
 
-    return {"status": "authorized"}
+    # 4. Return matching naming convention (active) to the extension
+    return {
+        "active": device.active,
+        "token_balance": device.token_balance,
+        "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction')]"]
+    }

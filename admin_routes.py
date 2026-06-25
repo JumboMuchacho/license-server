@@ -7,9 +7,8 @@ from database import get_db
 import models
 from billing import MpesaTransaction
 from pydantic import BaseModel
-from security import verify_oauth
+from auth import verify_oauth
 
-# Route prefix set to match your frontend calls
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 class DeviceUpdate(BaseModel):
@@ -32,24 +31,32 @@ def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
 async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
+        raise HTTPException(status_code=404, detail="Device tracking record completely missing.")
 
-    adjustment = body.get("token_adjustment", 0)
-    device.token_balance = max(0, device.token_balance + adjustment)
+    if "token_adjustment" in body:
+        try:
+            adjustment = int(body["token_adjustment"])
+            device.token_balance = max(0, device.token_balance + adjustment)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid token adjustment value.")
+
+    if "active" in body:
+        device.active = bool(body["active"])
+
     db.commit()
-    return {"new_balance": device.token_balance}
+    return {"success": True, "token_balance": device.token_balance, "active": device.active}
 
 @router.delete("/devices/{device_id}")
-def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
+async def delete_device(device_id: str, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
-    if device:
-        db.delete(device)
-        db.commit()
-    return {"status": "deleted"}
+    if not device:
+        raise HTTPException(status_code=404, detail="Target device not found in registry.")
+    db.delete(device)
+    db.commit()
+    return {"success": True}
 
 @router.get("/analytics")
-async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
-    # Using imported MpesaTransaction directly
+def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     total_revenue = db.query(func.sum(MpesaTransaction.amount)).filter(MpesaTransaction.status == "SUCCESS").scalar() or 0
     total_txns = db.query(MpesaTransaction).count()
     success_rate = db.query(MpesaTransaction).filter(MpesaTransaction.status == "SUCCESS").count()
@@ -69,18 +76,12 @@ async def get_analytics(db: Session = Depends(get_db), admin=Depends(verify_oaut
         }
     }
 
-# Add to admin_routes.py
 @router.post("/reset-analytics")
 async def reset_analytics(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     try:
-        # 1. Delete all transactions
         db.query(MpesaTransaction).delete()
-
-        # 2. Reset all device balances to 0
-        db.query(models.Device).update({"token_balance": 0})
-
         db.commit()
-        return {"status": "success", "message": "All analytics and balances have been reset."}
+        return {"success": True, "message": "All analytics logs successfully cleared."}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
