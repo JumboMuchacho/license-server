@@ -80,6 +80,17 @@ def register_device(request: Request, schema: RegistrationSchema, db: Session = 
     db.refresh(new_device)
     return {"status": "registered", "device_id": new_device.device_id, "token_balance": new_device.token_balance}
 
+@app.get("/")
+def read_root():
+    """Root endpoint to satisfy basic load balancer checks."""
+    return {"status": "online", "service": "Taptap Server Admin"}
+
+
+@app.get("/health")
+def health_check():
+    """Explicit health check endpoint targeted by hosting environment wrappers."""
+    return {"status": "healthy", "timestamp": time.time()}
+
 @app.get("/api/v1/status")
 @limiter.limit("60/minute")
 def get_status(request: Request, device_id: str, db: Session = Depends(get_db)):
