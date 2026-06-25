@@ -9,11 +9,9 @@ from billing import MpesaTransaction
 from pydantic import BaseModel
 from auth import verify_oauth
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
-
 class DeviceUpdate(BaseModel):
     active: Optional[bool] = None
-    token_balance: Optional[int] = None
+    token_adjustment: Optional[int] = None
 
 @router.get("/devices")
 def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
@@ -28,20 +26,17 @@ def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     ]
 
 @router.patch("/devices/{device_id}")
-async def update_device_tokens(device_id: str, body: dict, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
+async def update_device_tokens(device_id: str, body: DeviceUpdate, db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device tracking record completely missing.")
 
-    if "token_adjustment" in body:
-        try:
-            adjustment = int(body["token_adjustment"])
-            device.token_balance = max(0, device.token_balance + adjustment)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid token adjustment value.")
+    # Access fields as attributes, not dictionary keys
+    if body.token_adjustment is not None:
+        device.token_balance = max(0, device.token_balance + body.token_adjustment)
 
-    if "active" in body:
-        device.active = bool(body["active"])
+    if body.active is not None:
+        device.active = body.active
 
     db.commit()
     return {"success": True, "token_balance": device.token_balance, "active": device.active}
