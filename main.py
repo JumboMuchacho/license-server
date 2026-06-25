@@ -105,25 +105,22 @@ def get_device_status(request: Request, device_id: str, db: Session = Depends(ge
 @app.post("/api/v1/rules")
 @limiter.limit("60/minute")
 def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
-    # 1. Fetch device profile
+    # 1. Fetch device profile (using email/id)
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
     if not device:
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
-    # 2. Check token balance or active status strictly on the server side
+    # 2. Check token balance strictly on the server side
     if not device.active or device.token_balance <= 0:
         raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
 
-    # 3. Securely deduct token before giving away tracking data
-    device.token_balance -= 1
-    device.created_at = datetime.now(timezone.utc)
-    db.commit()
+    # REMOVED: device.token_balance -= 1 (Do not deduct tokens here!)
 
+    # Just return the rules securely
     return {
         "isActive": True,
         "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction')]"]
     }
-
 
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("60/minute")
