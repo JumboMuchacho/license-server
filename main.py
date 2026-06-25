@@ -21,7 +21,6 @@ import models
 from billing import MpesaTransaction
 from admin_routes import router as admin_router
 from billing_routes import router as billing_router
-# FIXED: Included RegistrationSchema into parsing layers for rules matching
 from schemas import RegistrationSchema, ConsumeTokenRequest
 
 load_dotenv()
@@ -46,54 +45,48 @@ app = FastAPI(
     redoc_url=None if is_production else "/redoc"
 )
 
+# --- SlowAPI Error Handler Setup ---
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# --- CORS Middleware (Crucial for Admin UI and Extension Connectivity) ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "chrome-extension://iaollkojbfolafoiljaaieijhflbiofi",
-        "https://license-server-lewp.onrender.com"
-    ],
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- 1. INCLUDE APPLICATION ROUTERS ---
 app.include_router(admin_router)
 app.include_router(billing_router)
 
-@app.post("/api/v1/register")
-@limiter.limit("5/minute")
-def register_device(request: Request, schema: RegistrationSchema, db: Session = Depends(get_db)):
-    try:
-        clean_id = str(uuid.UUID(schema.device_id.strip()))
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Malformed structure registration attempt rejected.")
 
-    existing = db.query(models.Device).filter(models.Device.device_id == clean_id).first()
-    if existing:
-        return {"status": "recognized", "device_id": existing.device_id, "token_balance": existing.token_balance}
-
-    new_device = models.Device(device_id=clean_id, token_balance=0, active=True)
-    db.add(new_device)
-    db.commit()
-    db.refresh(new_device)
-    return {"status": "registered", "device_id": new_device.device_id, "token_balance": new_device.token_balance}
-
-@app.get("/")
-def read_root():
-    """Root endpoint to satisfy basic load balancer checks."""
-    return {"status": "online", "service": "Taptap Server Admin"}
-
+# --- 2. CORE EXTENSION / SYSTEM ENDPOINTS ---
 
 @app.get("/health")
 def health_check():
-    """Explicit health check endpoint targeted by hosting environment wrappers."""
+    """Explicit health path to satisfy platform deployment checks."""
     return {"status": "healthy", "timestamp": time.time()}
+
+
+@app.post("/api/v1/register")
+@limiter.limit("20/minute")
+def register_device(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
+    existing = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+    if existing:
+        return {"status": "already_registered", "device_id": existing.device_id}
+
+    new_device = models.Device(device_id=body.device_id, token_balance=0, active=True)
+    db.add(new_device)
+    db.commit()
+    return {"status": "registered", "device_id": new_device.device_id}
+
 
 @app.get("/api/v1/status")
 @limiter.limit("60/minute")
-def get_status(request: Request, device_id: str, db: Session = Depends(get_db)):
+def get_device_status(request: Request, device_id: str, db: Session = Depends(get_db)):
     device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
     if not device:
         raise HTTPException(status_code=404, detail="Device context not found.")
@@ -108,6 +101,7 @@ def get_status(request: Request, device_id: str, db: Session = Depends(get_db)):
         "latest_payment_status": payment_status
     }
 
+
 @app.post("/api/v1/rules")
 @limiter.limit("60/minute")
 def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
@@ -120,14 +114,40 @@ def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(
     if not device.active or device.token_balance <= 0:
         raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
 
-    # 3. Securely deduct token *before* giving away tracking data
+    # 3. Securely deduct token before giving away tracking data
     device.token_balance -= 1
     device.created_at = datetime.now(timezone.utc)
     db.commit()
 
-    # 4. Return matching naming convention (active) to the extension
     return {
-        "active": device.active,
-        "token_balance": device.token_balance,
+        "isActive": True,
         "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction')]"]
     }
+
+
+@app.post("/api/v1/billing/consume-token")
+@limiter.limit("60/minute")
+def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Depends(get_db)):
+    # --- SERVER SIDE SECURITY GATEKEEPER ---
+    device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+
+    if not device:
+        raise HTTPException(status_code=410, detail="Device not found in registry.")
+
+    if not device.active or device.token_balance <= 0:
+        raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
+
+    device.token_balance -= 1
+    db.commit()
+    return {"success": True, "new_balance": device.token_balance}
+
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 2. Then, point your root domain endpoint directly to the file inside that folder
+@app.get("/")
+def serve_admin_ui():
+    """
+    Serves the main Admin UI index.html file from the static/admin directory.
+    """
+    return FileResponse("static/admin/index.html")
