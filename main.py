@@ -125,26 +125,36 @@ def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("60/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Depends(get_db)):
-    # --- SERVER SIDE SECURITY GATEKEEPER ---
+    """
+    This is the ONLY consume_token function you should have.
+    It includes the Idempotency Gatekeeper to prevent double-charging.
+    """
+
+    # 1. Verify if this txn_id was already processed
+    already_paid = db.query(models.ProcessedTransaction).filter(
+        models.ProcessedTransaction.txn_id == body.txn_id
+    ).first()
+
+    if already_paid:
+        return {"success": True, "message": "Already paid"}
+
+    # 2. Standard billing check
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+    if not device or device.token_balance <= 0:
+        raise HTTPException(status_code=403, detail="Insufficient balance")
 
-    if not device:
-        raise HTTPException(status_code=410, detail="Device not found in registry.")
-
-    if not device.active or device.token_balance <= 0:
-        raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
-
+    # 3. Deduct and Log the transaction ID to the DB
     device.token_balance -= 1
+    db.add(models.ProcessedTransaction(txn_id=body.txn_id, device_id=body.device_id))
     db.commit()
+
     return {"success": True, "new_balance": device.token_balance}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 2. Then, point your root domain endpoint directly to the file inside that folder
-@app.get("/")
-def serve_admin_ui():
-    """
-    Serves the main Admin UI index.html file from the static/admin directory.
-    """
-    return FileResponse("static/admin/index.html")
+@app.get("/admin")
+async def get_admin():
+    # This renders the index.html file properly
+    return FileResponse("admin/index.html")
