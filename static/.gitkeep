@@ -1,0 +1,2 @@
+mkdir static
+touch static/.gitkeep
