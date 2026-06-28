@@ -10,4 +10,4 @@ class STKPushRequest(BaseModel):
 
 class ConsumeTokenRequest(BaseModel):
     device_id: str
-    timestamp: int
+    txn_id: str
