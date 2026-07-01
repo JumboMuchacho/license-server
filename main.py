@@ -156,5 +156,4 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # 2. Then, point your root domain endpoint directly to the file inside that folder
 @app.get("/admin")
 async def get_admin():
-    # This renders the index.html file properly
     return FileResponse("admin/index.html")
