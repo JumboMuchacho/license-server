@@ -78,14 +78,18 @@ button { cursor:pointer; border-radius:8px; border:none; padding:8px 16px; font-
 </div>
 
 <script>
+const SB_URL = "https://hcjjyokagkgeqwqjexsf.supabase.co";
 const SB_KEY="sb_publishable_z4w1eemmXmOITtVPcypWxA_ZyxIZMme";  // pragma: allowlist secret
 const _supabase = supabase.createClient(SB_URL, SB_KEY);
 let growthChart; // Global variable to hold the chart instance
 
 async function getHeaders() {
-    const {data:{session}} = await _supabase.auth.getSession();
-    return { 'Authorization': `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' };
-}
+        const { data: { session } } = await _supabase.auth.getSession();
+        return {
+            "Content-Type": "application/json",
+            "Authorization": session ? `Bearer ${session.access_token}` : ""
+        };
+    }
 
 // 1. Initialize Chart
 function initChart(data) {
@@ -122,20 +126,41 @@ async function resetProduction() {
 async function load() {
     const headers = await getHeaders();
 
-    // Fetch both simultaneously
-    const [devicesRes, analyticsRes] = await Promise.all([
-        fetch("/admin/devices", { headers }),
-        fetch("/admin/analytics", { headers })
-    ]);
-
-    // Check if the server actually returned data
-    if (!devicesRes.ok || !analyticsRes.ok) {
-        console.error("Fetch failed", devicesRes.status, analyticsRes.status);
+    // 1. Check if we even have a token before trying to fetch
+    if (!headers.Authorization || headers.Authorization === "Bearer ") {
+        console.warn("User not logged in, redirecting to login...");
+        // Redirect to your login page or show a login button
         return;
     }
 
-    const data = await devicesRes.json();
-    const analytics = await analyticsRes.json();
+    try {
+        const [devicesRes, analyticsRes] = await Promise.all([
+            fetch("/admin/devices", { headers }),
+            fetch("/admin/analytics", { headers })
+        ]);
+
+        // 2. Handle unauthorized errors specifically
+        if (devicesRes.status === 401 || analyticsRes.status === 401) {
+            console.error("Session expired. Logging out...");
+            await _supabase.auth.signOut();
+            location.reload();
+            return;
+        }
+
+        if (!devicesRes.ok || !analyticsRes.ok) {
+            throw new Error(`Fetch failed: ${devicesRes.status}`);
+        }
+
+        const data = await devicesRes.json();
+        const analytics = await analyticsRes.json();
+
+        // ... proceed with your rendering logic
+        renderDashboard(data, analytics);
+
+    } catch (err) {
+        console.error("Dashboard Load Error:", err);
+    }
+}
 
     // Render Table
     const tbody = document.getElementById("devices-tbody");
@@ -161,7 +186,6 @@ async function load() {
     if (analytics.growth_data && analytics.growth_data.labels) {
         initChart(analytics.growth_data);
     }
-}
 
 async function updateBalance(id, action) {
     const amount = prompt("Enter token amount:");
