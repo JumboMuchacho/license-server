@@ -152,7 +152,7 @@ def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Dep
     return {"success": True, "new_balance": device.token_balance}
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/admin", StaticFiles(directory="admin"), name="admin")
 
 # 2. Then, point your root domain endpoint directly to the file inside that folder
 @app.get("/admin")
