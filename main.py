@@ -38,6 +38,10 @@ async def lifespan(app: FastAPI):
 is_production = os.getenv("ENV") == "production"
 limiter = Limiter(key_func=get_remote_address)
 
+# Temporary debug snippet in main.py
+for route in app.routes:
+    print(f"Registered route: {route.path}")
+
 app = FastAPI(
     title="Taptap Server Admin",
     lifespan=lifespan,
@@ -58,12 +62,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- 1. INCLUDE APPLICATION ROUTERS ---
 app.include_router(admin_router)
 app.include_router(billing_router)
 
-
-# --- 2. CORE EXTENSION / SYSTEM ENDPOINTS ---
 
 @app.get("/health")
 def health_check():
