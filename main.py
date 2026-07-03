@@ -110,8 +110,8 @@ def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("60/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Depends(get_db)):
-    already_paid = db.query(models.ProcessedTransaction).filter(
-        models.ProcessedTransaction.txn_id == body.txn_id
+    already_paid = db.query(models.Time).filter(
+        models.Time.txn_id == body.txn_id
     ).first()
     if already_paid:
         return {"success": True, "message": "Already paid"}
@@ -119,7 +119,7 @@ def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Dep
     if not device or device.token_balance <= 0:
         raise HTTPException(status_code=403, detail="Insufficient balance")
     device.token_balance -= 1
-    db.add(models.ProcessedTransaction(txn_id=body.txn_id, device_id=body.device_id))
+    db.add(models.Time(txn_id=body.txn_id, device_id=body.device_id))
     db.commit()
     return {"success": True, "new_balance": device.token_balance}
 
