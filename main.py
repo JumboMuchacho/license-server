@@ -132,6 +132,11 @@ async def get_admin():
     return FileResponse("admin/index.html")
 
 # --- DEBUG: Route Registration Check ---
-# Kept at the bottom so 'app' is fully initialized
 for route in app.routes:
-    print(f"Registered route: {route.path}")
+    # Check if the object has a 'path' attribute (standard routes)
+    # or handle 'APIRoute' objects specifically
+    if hasattr(route, "path"):
+        print(f"Registered route: {route.path}")
+    else:
+        # This handles the 'IncludedRouter' objects that caused the crash
+        print(f"Registered group: {route}")
