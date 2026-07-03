@@ -129,7 +129,6 @@ async function load() {
     // 1. Check if we even have a token before trying to fetch
     if (!headers.Authorization || headers.Authorization === "Bearer ") {
         console.warn("User not logged in, redirecting to login...");
-        // Redirect to your login page or show a login button
         return;
     }
 
@@ -154,7 +153,7 @@ async function load() {
         const data = await devicesRes.json();
         const analytics = await analyticsRes.json();
 
-        // ... proceed with your rendering logic
+        // Call the rendering function with the fetched data
         renderDashboard(data, analytics);
 
     } catch (err) {
@@ -162,8 +161,11 @@ async function load() {
     }
 }
 
-    // Render Table
+// Render Dashboard Data
+function renderDashboard(data, analytics) {
     const tbody = document.getElementById("devices-tbody");
+
+    // Render Table Rows
     tbody.innerHTML = data.map(d => `
         <tr>
             <td style="font-family:monospace; color:var(--accent);">${d.device_id}</td>
@@ -178,31 +180,36 @@ async function load() {
         </tr>
     `).join('');
 
-    // Update Stats and Chart
+    // Update Stats
     document.getElementById("stat-revenue").textContent = (analytics.revenue || 0).toLocaleString();
     document.getElementById("stat-txns").textContent = (analytics.total_txns || 0).toLocaleString();
 
-    // Add safety check before initializing chart
+    // Init Chart
     if (analytics.growth_data && analytics.growth_data.labels) {
         initChart(analytics.growth_data);
     }
+}
 
 async function updateBalance(id, action) {
     const amount = prompt("Enter token amount:");
     if (!amount) return;
     const val = action === 'sub' ? -parseInt(amount) : parseInt(amount);
+
     await fetch(`/admin/devices/${id}`, {
         method: "PATCH",
         headers: await getHeaders(),
         body: JSON.stringify({ token_adjustment: val })
     });
-    load();
+    load(); // Refresh dashboard
 }
 
 async function deleteDevice(id) {
     if (confirm("Delete device permanently?")) {
-        await fetch(`/admin/devices/${id}`, { method: "DELETE", headers: await getHeaders() });
-        load();
+        await fetch(`/admin/devices/${id}`, {
+            method: "DELETE",
+            headers: await getHeaders()
+        });
+        load(); // Refresh dashboard
     }
 }
 
