@@ -94,19 +94,35 @@ def get_device_status(request: Request, device_id: str, db: Session = Depends(ge
         "latest_payment_status": payment_status
     }
 
+import os
+
 @app.post("/api/v1/rules")
 @limiter.limit("60/minute")
 def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
+    # 1. Verify Device Identity
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
     if not device:
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
+
+    # 2. Check Device Status and Balances
     if not device.active or device.token_balance <= 0:
         raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
+
+    # 3. Fetch Configuration from Environment Variable
+    # Expected format: {"orderLabel": "Order Number", "timeLabel": "Create Time"}
+    default_config = '{"orderLabel": "Order Number", "timeLabel": "Create Time"}'
+    config_str = os.getenv("TARGET_SELECTOR_CONFIG", default_config)
+
+    try:
+        config = json.loads(config_str)
+    except json.JSONDecodeError:
+        config = json.loads(default_config)
+
+    # 4. Return the dynamic configuration
     return {
         "isActive": True,
-        "rules": ["//div[contains(@class, 'message')][contains(text(), 'There is no USDT transaction')]"]
+        "labels": config
     }
-
 @app.post("/api/v1/billing/consume-token")
 @limiter.limit("60/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Depends(get_db)):
