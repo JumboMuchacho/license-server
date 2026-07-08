@@ -8,8 +8,7 @@ async def trigger_stk_push(db, phone_number: str, amount: int, account_reference
     """
     Builds payload and triggers STK Push to Safaricom asynchronously.
     """
-    url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
-
+    url = os.getenv("MPESA_BASE_URL")
     shortcode = os.getenv("MPESA_SHORTCODE")
     passkey = os.getenv("MPESA_PASSKEY")
     callback_url = os.getenv("MPESA_CALLBACK_URL")
