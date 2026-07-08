@@ -13,10 +13,16 @@ _token_cache = {
 }
 
 def get_mpesa_access_token():
-    ck = os.getenv("MPESA_CONSUMER_KEY")
-    cs = os.getenv("MPESA_CONSUMER_SECRET")
-    print(f"DEBUG: CK is length {len(ck) if ck else 0}")
-    print(f"DEBUG: CS is length {len(cs) if cs else 0}")
+    # ... (cache check) ...
+    consumer_key = os.getenv("MPESA_CONSUMER_KEY")
+    consumer_secret = os.getenv("MPESA_CONSUMER_SECRET")
+    env_mode = os.getenv("MPESA_ENV", "sandbox").lower()
+    base_url = "api.safaricom.co.ke" if env_mode == "production" else "sandbox.safaricom.co.ke"
+
+    # DEFINE THIS FIRST
+    api_url = f"https://{base_url}/oauth/v1/generate?grant_type=client_credentials"
+
+    # THEN PRINT IT
     print(f"DEBUG: Target URL: {api_url}")
     if _token_cache["token"] and datetime.now() < _token_cache["expires_at"]:
         return _token_cache["token"]
