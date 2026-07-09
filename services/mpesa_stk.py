@@ -40,7 +40,7 @@ async def trigger_stk_push(
         "BusinessShortCode": shortcode,
         "Password": password,
         "Timestamp": timestamp,
-        "TransactionType": "CustomerPayBillOnline",
+        "TransactionType": "CustomerBuyGoodsOnline",
         "Amount": int(amount),
         "PartyA": str(phone_number),
         "PartyB": shortcode,
