@@ -67,12 +67,12 @@ async def initiate_stk_push(
 
     # --- TRIGGER M-PESA PIPELINE ---
     try:
-    access_token = get_mpesa_access_token()
+        access_token = get_mpesa_access_token()
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"M-Pesa authentication failed: {str(e)}"
-    )
+        )
     print(f"DEBUG: Triggering STK for {clean_phone} with token {access_token[:10]}...")
 
     response = await trigger_stk_push(
