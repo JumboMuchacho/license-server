@@ -2,7 +2,7 @@ import os
 import httpx
 import base64
 import logging
-from datetime import
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
