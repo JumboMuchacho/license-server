@@ -66,7 +66,13 @@ async def initiate_stk_push(
         raise HTTPException(status_code=400, detail="Invalid payload formatting data structure.")
 
     # --- TRIGGER M-PESA PIPELINE ---
+    try:
     access_token = get_mpesa_access_token()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"M-Pesa authentication failed: {str(e)}"
+    )
     print(f"DEBUG: Triggering STK for {clean_phone} with token {access_token[:10]}...")
 
     response = await trigger_stk_push(
@@ -77,8 +83,22 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-    resp_data = response.json()
-    print(f"DEBUG: SAFARICOM RAW RESPONSE: {resp_data}")
+    print("Status:", response.status_code)
+    print("Body:", response.text)
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Safaricom returned HTTP {response.status_code}: {response.text}"
+    )
+
+    try:
+        resp_data = response.json()
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Safaricom returned invalid JSON: {response.text}"
+        )
 
     # --- HANDLE RESPONSE ---
     if "CheckoutRequestID" in resp_data:
