@@ -4,12 +4,15 @@ from database import get_db, SessionLocal
 from billing import MpesaTransaction
 import models
 import json
+import logging
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
 from schemas import STKPushRequest
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
+logger = logging.getLogger(__name__)
 
 # Initialize SlowAPI rate limiting to safeguard the payment endpoint from abuse
 limiter = Limiter(key_func=get_remote_address)
