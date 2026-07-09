@@ -2,7 +2,8 @@ import os
 import httpx
 import base64
 import logging
-from datetime import datetime
+from datetime import
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,9 @@ async def trigger_stk_push(
         raise Exception("Missing one or more M-Pesa environment variables.")
 
     # Timestamp and password
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(
+        ZoneInfo("Africa/Nairobi")
+    ).strftime("%Y%m%d%H%M%S")
 
     password = base64.b64encode(
         f"{shortcode}{passkey}{timestamp}".encode("utf-8")
