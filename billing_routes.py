@@ -11,7 +11,6 @@ from services.mpesa_auth import get_mpesa_access_token
 from schemas import STKPushRequest
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
 logger = logging.getLogger(__name__)
 
 # Initialize SlowAPI rate limiting to safeguard the payment endpoint from abuse
@@ -22,28 +21,73 @@ router = APIRouter(prefix="/api/v1/mpesa")
 def process_callback_data(data: dict):
     """Background task to update device token balance directly."""
     db = SessionLocal()
+
     try:
+        logger.info("===== PROCESSING CALLBACK =====")
+        logger.info(json.dumps(data, indent=4))
+
         stk_callback = data.get("Body", {}).get("stkCallback", {})
+
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
+        result_desc = stk_callback.get("ResultDesc")
 
-        txn = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
-        if not txn: return
+        logger.info(
+            f"CheckoutRequestID={checkout_id}, "
+            f"ResultCode={result_code}, "
+            f"ResultDesc={result_desc}"
+        )
+
+        txn = (
+            db.query(MpesaTransaction)
+            .filter_by(checkout_request_id=checkout_id)
+            .first()
+        )
+
+        if not txn:
+            logger.warning(f"No transaction found for {checkout_id}")
+            return
 
         metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
-        amount = next((float(i["Value"]) for i in metadata if i["Name"] == "Amount"), 0)
 
-        device = db.query(models.Device).filter(models.Device.device_id == txn.device_id).first()
+        amount = next(
+            (
+                float(item["Value"])
+                for item in metadata
+                if item["Name"] == "Amount"
+            ),
+            0,
+        )
 
-        if device and result_code == 0:
-            device.token_balance += int(amount / 10)
+        device = (
+            db.query(models.Device)
+            .filter(models.Device.device_id == txn.device_id)
+            .first()
+        )
+
+        if result_code == 0:
             txn.status = "SUCCESS"
-            db.commit()
-        elif result_code != 0:
+
+            if device:
+                tokens = int(amount / 10)
+                device.token_balance += tokens
+
+                logger.info(
+                    f"Added {tokens} tokens to {device.device_id}"
+                )
+
+        else:
             txn.status = "FAILED"
-            db.commit()
-    except Exception as e:
-        print(f"Error in callback processing: {e}")
+            logger.warning(
+                f"Payment failed: {result_code} - {result_desc}"
+            )
+
+        db.commit()
+
+    except Exception:
+        logger.exception("Error processing callback.")
+        db.rollback()
+
     finally:
         db.close()
 
@@ -77,7 +121,7 @@ async def initiate_stk_push(
             status_code=500,
             detail=f"M-Pesa authentication failed: {str(e)}"
         )
-    print(f"DEBUG: Triggering STK for {clean_phone} with token {access_token[:10]}...")
+    logger.info(f"Triggering STK for {clean_phone}")
 
     response = await trigger_stk_push(
         db=db,
@@ -87,8 +131,8 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-    print("Status:", response.status_code)
-    print("Body:", response.text)
+    logger.info(f"Safaricom HTTP Status: {response.status_code}")
+    logger.info(f"Safaricom Response: {response.text}")
 
     if response.status_code != 200:
         raise HTTPException(
@@ -125,29 +169,32 @@ async def mpesa_callback(
     request: Request,
     bg_tasks: BackgroundTasks
 ):
-    # Verify that the request came from Safaricom
-    await verify_safaricom_ip(request)
-
-    # Parse callback payload
     try:
+        # Verify callback source
+        await verify_safaricom_ip(request)
+
         logger.info(f"Headers: {dict(request.headers)}")
+
         data = await request.json()
+
+        logger.info("========== M-PESA CALLBACK ==========")
+        logger.info(json.dumps(data, indent=4))
+        logger.info("====================================")
+
+        bg_tasks.add_task(process_callback_data, data)
+
+        return {
+            "ResultCode": 0,
+            "ResultDesc": "Accepted"
+        }
+
+    except HTTPException:
+        raise
+
     except Exception:
-        logger.exception("Invalid callback JSON received.")
+        logger.exception("Callback processing failed.")
+
         raise HTTPException(
-            status_code=400,
-            detail="Invalid callback payload."
+            status_code=500,
+            detail="Callback processing failed."
         )
-
-    # Log the callback for debugging
-    logger.info("========== M-PESA CALLBACK ==========")
-    logger.info(json.dumps(data, indent=4))
-    logger.info("====================================")
-
-    # Process callback asynchronously
-    bg_tasks.add_task(process_callback_data, data)
-
-    return {
-        "ResultCode": 0,
-        "ResultDesc": "Accepted"
-    }
