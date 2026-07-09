@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db, SessionLocal
 from billing import MpesaTransaction
 import models
+import json
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
@@ -117,12 +118,33 @@ async def initiate_stk_push(
 
 
 @router.post("/callback")
-async def mpesa_callback(request: Request, bg_tasks: BackgroundTasks):
+async def mpesa_callback(
+    request: Request,
+    bg_tasks: BackgroundTasks
+):
+    # Verify that the request came from Safaricom
+    await verify_safaricom_ip(request)
+
+    # Parse callback payload
     try:
-        await verify_safaricom_ip(request)
+        logger.info(f"Headers: {dict(request.headers)}")
         data = await request.json()
-        bg_tasks.add_task(process_callback_data, data)
-        return {"ResultCode": 0, "ResultDesc": "Accepted"}
-    except Exception as e:
-        print(f"Callback security error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid request")
+    except Exception:
+        logger.exception("Invalid callback JSON received.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid callback payload."
+        )
+
+    # Log the callback for debugging
+    logger.info("========== M-PESA CALLBACK ==========")
+    logger.info(json.dumps(data, indent=4))
+    logger.info("====================================")
+
+    # Process callback asynchronously
+    bg_tasks.add_task(process_callback_data, data)
+
+    return {
+        "ResultCode": 0,
+        "ResultDesc": "Accepted"
+    }

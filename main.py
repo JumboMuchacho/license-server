@@ -2,6 +2,7 @@ import os
 import time
 import uuid
 import json
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Request
@@ -81,21 +82,39 @@ def register_device(request: Request, body: RegistrationSchema, db: Session = De
     return {"status": "registered", "device_id": new_device.device_id}
 
 @app.get("/api/v1/status")
-@limiter.limit("60/minute")
-def get_device_status(request: Request, device_id: str, db: Session = Depends(get_db)):
-    device = db.query(models.Device).filter(models.Device.device_id == device_id).first()
+@limiter.limit("15/minute")
+def get_device_status(
+    request: Request,
+    device_id: str,
+    db: Session = Depends(get_db)
+):
+    device = (
+        db.query(models.Device)
+        .filter(models.Device.device_id == device_id)
+        .first()
+    )
+
     if not device:
-        raise HTTPException(status_code=404, detail="Device context not found.")
-    latest_txn = db.query(MpesaTransaction).filter(MpesaTransaction.device_id == device_id).order_by(MpesaTransaction.created_at.desc()).first()
+        raise HTTPException(
+            status_code=404,
+            detail="Device context not found."
+        )
+
+    latest_txn = (
+        db.query(MpesaTransaction)
+        .filter(MpesaTransaction.device_id == device_id)
+        .order_by(MpesaTransaction.created_at.desc())
+        .first()
+    )
+
     payment_status = latest_txn.status if latest_txn else "NONE"
+
     return {
         "device_id": device.device_id,
         "token_balance": device.token_balance,
         "active": device.active,
         "latest_payment_status": payment_status
     }
-
-import os
 
 @app.post("/api/v1/rules")
 @limiter.limit("60/minute")
