@@ -123,8 +123,10 @@ def register_device(
             "device_id": existing.device_id
         }
 
+    clean_id = body.device_id.strip().lower()
+
     new_device = models.Device(
-        device_id=device_id,
+        device_id=clean_id,
         token_balance=0,
         active=True
     )
