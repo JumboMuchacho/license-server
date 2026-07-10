@@ -19,34 +19,37 @@ async def trigger_stk_push(
     Builds and sends an STK Push request to Safaricom.
     """
 
-    # Build the endpoint safely
+    # Build endpoint
     base_url = os.getenv("MPESA_BASE_URL", "").rstrip("/")
     url = f"{base_url}/mpesa/stkpush/v1/processrequest"
 
-    shortcode = os.getenv("MPESA_SHORTCODE")
+    # Credentials
+    business_shortcode = os.getenv("MPESA_SHORTCODE")
+    party_b = os.getenv("MPESA_PARTY_B") or business_shortcode
     passkey = os.getenv("MPESA_PASSKEY")
     callback_url = os.getenv("MPESA_CALLBACK_URL")
 
-    if not all([shortcode, passkey, callback_url]):
-        raise Exception("Missing one or more M-Pesa environment variables.")
+    if not all([business_shortcode, party_b, passkey, callback_url]):
+        raise Exception("Missing one or more required M-Pesa environment variables.")
 
-    # Timestamp and password
+    # Timestamp
     timestamp = datetime.now(
         ZoneInfo("Africa/Nairobi")
     ).strftime("%Y%m%d%H%M%S")
 
+    # Password is ALWAYS generated using the BusinessShortCode
     password = base64.b64encode(
-        f"{shortcode}{passkey}{timestamp}".encode("utf-8")
+        f"{business_shortcode}{passkey}{timestamp}".encode("utf-8")
     ).decode("utf-8")
 
     payload = {
-        "BusinessShortCode": shortcode,
+        "BusinessShortCode": business_shortcode,
         "Password": password,
         "Timestamp": timestamp,
         "TransactionType": "CustomerBuyGoodsOnline",
         "Amount": int(amount),
         "PartyA": str(phone_number),
-        "PartyB": shortcode,
+        "PartyB": party_b,
         "PhoneNumber": str(phone_number),
         "CallBackURL": callback_url,
         "AccountReference": account_reference,
@@ -59,6 +62,9 @@ async def trigger_stk_push(
     }
 
     logger.info(f"Posting STK Push to: {url}")
+    logger.info(f"BusinessShortCode: {business_shortcode}")
+    logger.info(f"PartyB: {party_b}")
+    logger.info(f"TransactionType: {payload['TransactionType']}")
     logger.info(f"Phone: {phone_number}")
     logger.info(f"Amount: {amount}")
     logger.info(f"Account Reference: {account_reference}")
@@ -73,7 +79,6 @@ async def trigger_stk_push(
     logger.info(f"Safaricom Status: {response.status_code}")
     logger.info(f"Safaricom Response: {response.text}")
 
-    # Raise an exception for HTTP errors (4xx/5xx)
     response.raise_for_status()
 
     return response
