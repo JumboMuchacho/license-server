@@ -3,6 +3,7 @@ import time
 import uuid
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Request
@@ -52,34 +53,91 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- CORS Middleware ---
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://license-server-lewp.onrender.com",
+
+        # Chrome Extension Origin
+        "chrome-extension://iaollkojbfolafoiljaaieijhflbiofi",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# -------------------------------------------------------
+# Email Validation
+# -------------------------------------------------------
+
+import re
+
+EMAIL_REGEX = re.compile(
+    r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+)
+
 # --- Include Routers ---
+
 app.include_router(admin_router)
 app.include_router(billing_router)
 
-# --- Routes ---
+# -------------------------------------------------------
+# Routes
+# -------------------------------------------------------
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "timestamp": time.time()}
+    return {
+        "status": "healthy",
+        "timestamp": time.time()
+    }
+
 
 @app.post("/api/v1/register")
 @limiter.limit("20/minute")
-def register_device(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
-    existing = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+def register_device(
+    request: Request,
+    body: RegistrationSchema,
+    db: Session = Depends(get_db)
+):
+    device_id = body.device_id.strip().lower()
+
+    if not EMAIL_REGEX.fullmatch(device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid email address."
+        )
+
+    existing = (
+        db.query(models.Device)
+        .filter(models.Device.device_id == device_id)
+        .first()
+    )
+
     if existing:
-        return {"status": "already_registered", "device_id": existing.device_id}
-    new_device = models.Device(device_id=body.device_id, token_balance=0, active=True)
+        return {
+            "status": "already_registered",
+            "device_id": existing.device_id
+        }
+
+    new_device = models.Device(
+        device_id=device_id,
+        token_balance=0,
+        active=True
+    )
+
     db.add(new_device)
     db.commit()
-    return {"status": "registered", "device_id": new_device.device_id}
+    db.refresh(new_device)
+
+    return {
+        "status": "registered",
+        "device_id": new_device.device_id
+    }
+
 
 @app.get("/api/v1/status")
 @limiter.limit("15/minute")
@@ -88,6 +146,14 @@ def get_device_status(
     device_id: str,
     db: Session = Depends(get_db)
 ):
+    device_id = device_id.strip().lower()
+
+    if not EMAIL_REGEX.fullmatch(device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid device identifier."
+        )
+
     device = (
         db.query(models.Device)
         .filter(models.Device.device_id == device_id)
@@ -107,7 +173,11 @@ def get_device_status(
         .first()
     )
 
-    payment_status = latest_txn.status if latest_txn else "NONE"
+    payment_status = (
+        latest_txn.status
+        if latest_txn
+        else "NONE"
+    )
 
     return {
         "device_id": device.device_id,
@@ -116,35 +186,67 @@ def get_device_status(
         "latest_payment_status": payment_status
     }
 
+
 @app.post("/api/v1/rules")
-@limiter.limit("60/minute")
-def get_rules(request: Request, body: RegistrationSchema, db: Session = Depends(get_db)):
-    # 1. Verify Device Identity
-    device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
+@limiter.limit("20/minute")
+def get_rules(
+    request: Request,
+    body: RegistrationSchema,
+    db: Session = Depends(get_db)
+):
+    device_id = body.device_id.strip().lower()
+
+    if not EMAIL_REGEX.fullmatch(device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid device identifier."
+        )
+
+    device = (
+        db.query(models.Device)
+        .filter(models.Device.device_id == device_id)
+        .first()
+    )
+
     if not device:
-        raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized Device Identity."
+        )
 
-    # 2. Check Device Status and Balances
-    if not device.active or device.token_balance <= 0:
-        raise HTTPException(status_code=403, detail="Forbidden or Insufficient balances.")
+    if not device.active:
+        raise HTTPException(
+            status_code=403,
+            detail="Device disabled."
+        )
 
-    # 3. Fetch Configuration from Environment Variable
-    # Expected format: {"orderLabel": "Order Number", "timeLabel": "Create Time"}
-    default_config = '{"orderLabel": "Order Number", "timeLabel": "Create Time"}'
-    config_str = os.getenv("TARGET_SELECTOR_CONFIG", default_config)
+    if device.token_balance <= 0:
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient balance."
+        )
+
+    default_config = {
+        "orderLabel": "Order Number",
+        "timeLabel": "Create Time"
+    }
+
+    config_str = os.getenv(
+        "TARGET_SELECTOR_CONFIG",
+        json.dumps(default_config)
+    )
 
     try:
         config = json.loads(config_str)
     except json.JSONDecodeError:
-        config = json.loads(default_config)
+        config = default_config
 
-    # 4. Return the dynamic configuration
     return {
         "isActive": True,
         "labels": config
     }
 @app.post("/api/v1/billing/consume-token")
-@limiter.limit("60/minute")
+@limiter.limit("20/minute")
 def consume_token(request: Request, body: ConsumeTokenRequest, db: Session = Depends(get_db)):
     already_paid = db.query(models.Time).filter(
         models.Time.txn_id == body.txn_id
