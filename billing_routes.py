@@ -21,84 +21,97 @@ router = APIRouter(prefix="/api/v1/mpesa")
 def process_callback_data(data: dict):
     """Background task to update device token balance directly."""
     db = SessionLocal()
+
     try:
         stk_callback = data.get("Body", {}).get("stkCallback", {})
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
         result_desc = stk_callback.get("ResultDesc")
 
-        txn = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
+        txn = (
+            db.query(MpesaTransaction)
+            .filter_by(checkout_request_id=checkout_id)
+            .first()
+        )
 
         if not txn:
-            logger.warning(f"No transaction found for {checkout_id}")
+            logger.warning("No transaction found for %s", checkout_id)
             return
+
+        # Ignore duplicate callbacks
         if txn.status == "SUCCESS":
-            logger.info(
-                 "Duplicate callback ignored for %s",
-                  checkout_id,
-                  )
+            logger.info("Duplicate callback ignored for %s", checkout_id)
             return
 
-           # Save callback result details
-    txn.result_code = result_code
-    txn.result_desc = result_desc
+        # Save callback result details
+        txn.result_code = result_code
+        txn.result_desc = result_desc
 
-    # Convert callback metadata into a dictionary for easier access
-    metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
-    metadata_dict = {
-        item["Name"]: item.get("Value")
-        for item in metadata
-        if "Name" in item
-    }
+        # Convert callback metadata into a dictionary
+        metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+        metadata_dict = {
+            item["Name"]: item.get("Value")
+            for item in metadata
+            if "Name" in item
+        }
 
-    # Save M-Pesa receipt number
-    txn.mpesa_receipt_number = metadata_dict.get("MpesaReceiptNumber")
+        # Save receipt
+        txn.mpesa_receipt_number = metadata_dict.get("MpesaReceiptNumber")
 
-    # Save completion time
-    transaction_date = metadata_dict.get("TransactionDate")
-    if transaction_date:
-        txn.completed_at = datetime.strptime(
-            str(transaction_date),
-            "%Y%m%d%H%M%S",
-        ).replace(tzinfo=timezone.utc)
-    else:
-        # Fallback to the current server time if Safaricom didn't provide one
-        txn.completed_at = datetime.now(timezone.utc)
+        # Save completion time
+        transaction_date = metadata_dict.get("TransactionDate")
 
-    # Amount paid
-    amount = float(metadata_dict.get("Amount", 0))
+        if transaction_date:
+            txn.completed_at = datetime.strptime(
+                str(transaction_date),
+                "%Y%m%d%H%M%S",
+            ).replace(tzinfo=timezone.utc)
+        else:
+            txn.completed_at = datetime.now(timezone.utc)
 
-    # Find the associated device
-    device = (
-        db.query(models.Device)
-        .filter(models.Device.device_id == txn.device_id)
-        .first()
-    )
+        # Amount paid
+        amount = float(metadata_dict.get("Amount", 0))
+
+        # Associated device
+        device = (
+            db.query(models.Device)
+            .filter(models.Device.device_id == txn.device_id)
+            .first()
+        )
+
         if result_code == 0:
             txn.status = "SUCCESS"
+
             if device:
                 tokens = int(amount / 10)
                 device.token_balance += tokens
-                # Fix 6: Detailed logging
+
                 logger.info(
-                        "Payment successful | Checkout=%s | Receipt=%s | Amount=KES %.0f | Tokens=%d | User=%s | Balance=%d",
-                        checkout_id,
-                        receipt,
-                        amount,
-                        tokens,
-                        device.device_id,
-                        device.token_balance,
-                    )
+                    "Payment successful | Checkout=%s | Receipt=%s | Amount=KES %.0f | Tokens=%d | User=%s | Balance=%d",
+                    checkout_id,
+                    txn.mpesa_receipt_number,
+                    amount,
+                    tokens,
+                    device.device_id,
+                    device.token_balance,
+                )
+
         else:
             txn.status = "FAILED"
-            # Fix 5: Concise logging
-            logger.info("Payment failed | Checkout=%s | Result=%s | Desc=%s", checkout_id, result_code, result_desc)
+
+            logger.info(
+                "Payment failed | Checkout=%s | Result=%s | Desc=%s",
+                checkout_id,
+                result_code,
+                result_desc,
+            )
 
         db.commit()
 
     except Exception:
         logger.exception("Error processing callback.")
         db.rollback()
+
     finally:
         db.close()
 
