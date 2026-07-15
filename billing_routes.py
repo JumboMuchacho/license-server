@@ -5,92 +5,102 @@ from billing import MpesaTransaction
 import models
 import json
 import logging
+from datetime import datetime, timezone # Fix 3
 from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
 from services.mpesa_stk import trigger_stk_push
 from services.mpesa_auth import get_mpesa_access_token
 from schemas import STKPushRequest
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 logger = logging.getLogger(__name__)
 
-# Initialize SlowAPI rate limiting to safeguard the payment endpoint from abuse
 limiter = Limiter(key_func=get_remote_address)
-
 router = APIRouter(prefix="/api/v1/mpesa")
 
 def process_callback_data(data: dict):
     """Background task to update device token balance directly."""
     db = SessionLocal()
-
     try:
-        logger.info("===== PROCESSING CALLBACK =====")
-        logger.info(json.dumps(data, indent=4))
-
         stk_callback = data.get("Body", {}).get("stkCallback", {})
-
         checkout_id = stk_callback.get("CheckoutRequestID")
         result_code = stk_callback.get("ResultCode")
         result_desc = stk_callback.get("ResultDesc")
 
-        logger.info(
-            f"CheckoutRequestID={checkout_id}, "
-            f"ResultCode={result_code}, "
-            f"ResultDesc={result_desc}"
-        )
-
-        txn = (
-            db.query(MpesaTransaction)
-            .filter_by(checkout_request_id=checkout_id)
-            .first()
-        )
+        txn = db.query(MpesaTransaction).filter_by(checkout_request_id=checkout_id).first()
 
         if not txn:
             logger.warning(f"No transaction found for {checkout_id}")
             return
+        if txn.status == "SUCCESS":
+            logger.info(
+                 "Duplicate callback ignored for %s",
+                  checkout_id,
+         )
+         return
 
-        metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+           # Save callback result details
+    txn.result_code = result_code
+    txn.result_desc = result_desc
 
-        amount = next(
-            (
-                float(item["Value"])
-                for item in metadata
-                if item["Name"] == "Amount"
-            ),
-            0,
-        )
+    # Convert callback metadata into a dictionary for easier access
+    metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+    metadata_dict = {
+        item["Name"]: item.get("Value")
+        for item in metadata
+        if "Name" in item
+    }
 
-        device = (
-            db.query(models.Device)
-            .filter(models.Device.device_id == txn.device_id)
-            .first()
-        )
+    # Save M-Pesa receipt number
+    txn.mpesa_receipt_number = metadata_dict.get("MpesaReceiptNumber")
 
+    # Save completion time
+    transaction_date = metadata_dict.get("TransactionDate")
+    if transaction_date:
+        txn.completed_at = datetime.strptime(
+            str(transaction_date),
+            "%Y%m%d%H%M%S",
+        ).replace(tzinfo=timezone.utc)
+    else:
+        # Fallback to the current server time if Safaricom didn't provide one
+        txn.completed_at = datetime.now(timezone.utc)
+
+    # Amount paid
+    amount = float(metadata_dict.get("Amount", 0))
+
+    # Find the associated device
+    device = (
+        db.query(models.Device)
+        .filter(models.Device.device_id == txn.device_id)
+        .first()
+    )
         if result_code == 0:
             txn.status = "SUCCESS"
-
             if device:
                 tokens = int(amount / 10)
                 device.token_balance += tokens
-
+                # Fix 6: Detailed logging
                 logger.info(
-                    f"Added {tokens} tokens to {device.device_id}"
-                )
-
+                        "Payment successful | Checkout=%s | Receipt=%s | Amount=KES %.0f | Tokens=%d | User=%s | Balance=%d",
+                        checkout_id,
+                        receipt,
+                        amount,
+                        tokens,
+                        device.device_id,
+                        device.token_balance,
+                    )
         else:
             txn.status = "FAILED"
-            logger.warning(
-                f"Payment failed: {result_code} - {result_desc}"
-            )
+            # Fix 5: Concise logging
+            logger.info("Payment failed | Checkout=%s | Result=%s | Desc=%s", checkout_id, result_code, result_desc)
 
         db.commit()
 
     except Exception:
         logger.exception("Error processing callback.")
         db.rollback()
-
     finally:
         db.close()
-
 
 @router.post("/stkpush")
 @limiter.limit("5/minute")  # Protects your API from bot-loops slamming your Safaricom budget
@@ -173,13 +183,9 @@ async def mpesa_callback(
         # Verify callback source
         await verify_safaricom_ip(request)
 
-        logger.info(f"Headers: {dict(request.headers)}")
+        #logger.info(f"Headers: {dict(request.headers)}")
 
         data = await request.json()
-
-        logger.info("========== M-PESA CALLBACK ==========")
-        logger.info(json.dumps(data, indent=4))
-        logger.info("====================================")
 
         bg_tasks.add_task(process_callback_data, data)
 

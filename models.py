@@ -1,5 +1,15 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func # Import func
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    func,
+)
+
 from database import Base
+
 
 class Device(Base):
     __tablename__ = "devices"
@@ -9,11 +19,25 @@ class Device(Base):
     token_balance = Column(Integer, default=0)
     active = Column(Boolean, default=True)
 
-    # Use server_default=func.now() for database-generated timestamps
+    # Automatically set when the device is first registered
     created_at = Column(DateTime, server_default=func.now())
-# Add this to models.py
-class Time(Base):
-    __tablename__ = "time"
+
+
+class ConsumedToken(Base):
+    __tablename__ = "consumed_tokens"
+
     id = Column(Integer, primary_key=True)
-    txn_id = Column(String, unique=True, index=True) # This prevents duplicates
-    device_id = Column(String)
+
+    # Website transaction/order ID (prevents consuming a token twice)
+    txn_id = Column(String, unique=True, index=True, nullable=False)
+
+    # Device that consumed the token
+    device_id = Column(
+        String,
+        ForeignKey("devices.device_id"),
+        nullable=False,
+        index=True,
+    )
+
+    # Automatically set when the token is consumed
+    created_at = Column(DateTime, server_default=func.now())
