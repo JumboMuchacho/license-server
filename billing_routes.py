@@ -36,8 +36,8 @@ def process_callback_data(data: dict):
             logger.info(
                  "Duplicate callback ignored for %s",
                   checkout_id,
-         )
-         return
+                  )
+            return
 
            # Save callback result details
     txn.result_code = result_code
