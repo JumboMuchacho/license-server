@@ -11,6 +11,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000,"
+    "https://license-server-lewp.onrender.com,"
+    "chrome-extension://iaollkojbfolafoiljaaieijhflbiofi",
+).split(",")
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,22 +78,15 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://license-server-lewp.onrender.com",
-
-        # Chrome Extension Origin
-        "chrome-extension://iaollkojbfolafoiljaaieijhflbiofi",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# -------------------------------------------------------
+# ==========================
 # Email Validation
-# -------------------------------------------------------
+# ==========================
 
 EMAIL_REGEX = re.compile(
     r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -96,9 +97,9 @@ EMAIL_REGEX = re.compile(
 app.include_router(admin_router)
 app.include_router(billing_router)
 
-# -------------------------------------------------------
+# ==========================
 # Routes
-# -------------------------------------------------------
+# ==========================
 
 @app.get("/health")
 def health_check():
