@@ -1,17 +1,23 @@
 import os
 import time
-import uuid
 import json
 import logging
 import re
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
+logger = logging.getLogger(__name__)
 
 # --- SlowAPI Imports ---
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -32,11 +38,19 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     try:
         init_db()
-        print("Database tables initialized successfully.")
-    except Exception as e:
-        print(f"CRITICAL: Could not connect to database: {e}")
+        logger.info("Database tables initialized successfully.")
+    except Exception:
+        logger.exception("Database initialization failed.")
+        raise
+
     yield
+
+    logger.info("Server shutting down... Bye bye Batman!")
     engine.dispose()
+    logger.info(
+    "Boot sequence initialized.. Hello Batman! (%s)",
+    "Production" if is_production else "Development"
+)
 
 is_production = os.getenv("ENV") == "production"
 limiter = Limiter(key_func=get_remote_address)
@@ -72,8 +86,6 @@ app.add_middleware(
 # -------------------------------------------------------
 # Email Validation
 # -------------------------------------------------------
-
-import re
 
 EMAIL_REGEX = re.compile(
     r"^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -271,12 +283,4 @@ app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
 async def get_admin():
     return FileResponse("admin/index.html")
 
-# --- DEBUG: Route Registration Check ---
-for route in app.routes:
-    # Check if the object has a 'path' attribute (standard routes)
-    # or handle 'APIRoute' objects specifically
-    if hasattr(route, "path"):
-        print(f"Registered route: {route.path}")
-    else:
-        # This handles the 'IncludedRouter' objects that caused the crash
-        print(f"Registered group: {route}")
+logger.info("Routes registered successfully.")
