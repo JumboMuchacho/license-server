@@ -39,6 +39,15 @@ from billing import MpesaTransaction
 from admin_routes import router as admin_router
 from billing_routes import router as billing_router
 from schemas import RegistrationSchema, ConsumeTokenRequest
+from datetime import datetime, timezone, timedelta
+
+# ==========================
+# Online Presence Tracking
+# ==========================
+
+ONLINE_USERS = {}
+
+ONLINE_TIMEOUT = timedelta(seconds=150)
 
 load_dotenv()
 
@@ -153,6 +162,23 @@ def register_device(
         "device_id": new_device.device_id
     }
 
+@app.post("/api/v1/heartbeat")
+@limiter.limit("30/minute")
+def heartbeat(
+    request: Request,
+    body: RegistrationSchema,
+):
+    device_id = body.device_id.strip().lower()
+
+    if not EMAIL_REGEX.fullmatch(device_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid device identifier."
+        )
+
+    ONLINE_USERS[device_id] = datetime.now(timezone.utc)
+
+    return {"success": True}
 
 @app.get("/api/v1/status")
 @limiter.limit("15/minute")
@@ -193,13 +219,27 @@ def get_device_status(
         if latest_txn
         else "NONE"
     )
+        # Remove expired online users
+    now = datetime.now(timezone.utc)
+
+    expired = [
+        device
+        for device, last_seen in ONLINE_USERS.items()
+        if now - last_seen > ONLINE_TIMEOUT
+    ]
+
+    for device in expired:
+        ONLINE_USERS.pop(device, None)
+
+    online_users = len(ONLINE_USERS)
 
     return {
-        "device_id": device.device_id,
-        "token_balance": device.token_balance,
-        "active": device.active,
-        "latest_payment_status": payment_status
-    }
+    "device_id": device.device_id,
+    "token_balance": device.token_balance,
+    "active": device.active,
+    "latest_payment_status": payment_status,
+    "online_users": online_users
+}
 
 
 @app.post("/api/v1/rules")
