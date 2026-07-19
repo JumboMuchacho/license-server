@@ -177,7 +177,7 @@ async def heartbeat(
             detail="Device not found"
         )
 
-    device.last_seen = datetime.now(timezone.utc)
+    device.last_seen = datetime.utcnow()
 
     db.commit()
 
@@ -225,7 +225,7 @@ def get_device_status(
         else "NONE"
     )
 
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=3)
+    cutoff = datetime.utcnow() - timedelta(minutes=3)
 
     online_users = (
         db.query(models.Device)
