@@ -67,7 +67,7 @@ def process_callback_data(data: dict):
                 "%Y%m%d%H%M%S",
             ).replace(tzinfo=timezone.utc)
         else:
-            txn.completed_at = datetime.now(timezone.utc)
+            txn.completed_at = datetime.utcnow()
 
         # Amount paid
         amount = float(metadata_dict.get("Amount", 0))

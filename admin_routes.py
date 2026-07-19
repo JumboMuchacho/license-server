@@ -18,7 +18,7 @@ class DeviceUpdate(BaseModel):
 @router.get("/devices")
 def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
     devices = db.query(models.Device).all()
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=3)
+    cutoff = datetime.utcnow() - timedelta(minutes=3)
     return [
     {
         "device_id": d.device_id,
@@ -26,7 +26,10 @@ def get_all_devices(db: Session = Depends(get_db), admin=Depends(verify_oauth)):
         "token_balance": d.token_balance,
         "created_at": d.created_at.isoformat() if d.created_at else None,
         "last_seen": d.last_seen.isoformat() if d.last_seen else None,
-        "online": bool(d.last_seen and d.last_seen >= cutoff),
+        "online": (
+            d.last_seen is not None
+            and d.last_seen >= cutoff
+        ),
     }
     for d in devices
 ]
@@ -92,7 +95,7 @@ def online_devices(
     db: Session = Depends(get_db),
     admin=Depends(verify_oauth),
 ):
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=3)
+    cutoff = datetime.utcnow() - timedelta(minutes=3)
 
     devices = (
         db.query(models.Device)
