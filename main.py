@@ -159,22 +159,30 @@ def register_device(
     }
 
 @app.post("/api/v1/heartbeat")
-@limiter.limit("30/minute")
-def heartbeat(
-    request: Request,
-    body: RegistrationSchema,
+async def heartbeat(
+    payload: RegistrationSchema,
+    db: Session = Depends(get_db)
 ):
-    device_id = body.device_id.strip().lower()
 
-    if not EMAIL_REGEX.fullmatch(device_id):
+    device = (
+        db.query(Device)
+        .filter(Device.device_id == payload.device_id)
+        .first()
+    )
+
+    if not device:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid device identifier."
+            status_code=404,
+            detail="Device not found"
         )
 
-    ONLINE_USERS[device_id] = datetime.now(timezone.utc)
+    device.last_seen = datetime.now(timezone.utc)
 
-    return {"success": True}
+    db.commit()
+
+    return {
+        "success": True
+    }
 
 @app.get("/api/v1/status")
 @limiter.limit("15/minute")
@@ -215,27 +223,36 @@ def get_device_status(
         if latest_txn
         else "NONE"
     )
-        # Remove expired online users
-    now = datetime.now(timezone.utc)
 
-    expired = [
-        device
-        for device, last_seen in ONLINE_USERS.items()
-        if now - last_seen > ONLINE_TIMEOUT
-    ]
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=3)
 
-    for device in expired:
-        ONLINE_USERS.pop(device, None)
+    online_users = (
+        db.query(models.Device)
+        .filter(
+            models.Device.last_seen.isnot(None),
+            models.Device.last_seen >= cutoff
+        )
+        .count()
+    )
 
-    online_users = len(ONLINE_USERS)
+    online = (
+        device.last_seen is not None
+        and device.last_seen >= cutoff
+    )
 
     return {
-    "device_id": device.device_id,
-    "token_balance": device.token_balance,
-    "active": device.active,
-    "latest_payment_status": payment_status,
-    "online_users": online_users
-}
+        "device_id": device.device_id,
+        "token_balance": device.token_balance,
+        "active": device.active,
+        "online": online,
+        "online_users": online_users,
+        "last_seen": (
+            device.last_seen.isoformat()
+            if device.last_seen
+            else None
+        ),
+        "latest_payment_status": payment_status
+    }
 
 
 @app.post("/api/v1/rules")
