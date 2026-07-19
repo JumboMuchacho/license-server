@@ -10,18 +10,6 @@ from sqlalchemy import (
 
 from database import Base
 
-
-class Device(Base):
-    __tablename__ = "devices"
-
-    id = Column(Integer, primary_key=True)
-    device_id = Column(String, unique=True, index=True, nullable=False)
-    token_balance = Column(Integer, default=0)
-    active = Column(Boolean, default=True)
-
-    # Automatically set when the device is first registered
-    created_at = Column(DateTime, server_default=func.now())
-
 class Device(Base):
     __tablename__ = "devices"
 
