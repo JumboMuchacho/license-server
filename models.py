@@ -39,7 +39,7 @@ class Device(Base):
 
     # Updated every heartbeat
     last_seen = Column(
-        DateTime(timezone=True),
+        DateTime,
         nullable=True,
         index=True,
     )
