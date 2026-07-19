@@ -45,10 +45,6 @@ from datetime import datetime, timezone, timedelta
 # Online Presence Tracking
 # ==========================
 
-ONLINE_USERS = {}
-
-ONLINE_TIMEOUT = timedelta(seconds=150)
-
 load_dotenv()
 
 @asynccontextmanager

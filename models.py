@@ -22,23 +22,38 @@ class Device(Base):
     # Automatically set when the device is first registered
     created_at = Column(DateTime, server_default=func.now())
 
-class OnlineDevice(Base):
-    __tablename__ = "online_devices"
+class Device(Base):
+    __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True)
 
     device_id = Column(
         String,
-        ForeignKey("devices.device_id"),
         unique=True,
         index=True,
         nullable=False,
     )
 
-    last_seen = Column(
+    token_balance = Column(
+        Integer,
+        default=0,
+    )
+
+    active = Column(
+        Boolean,
+        default=True,
+    )
+
+    created_at = Column(
         DateTime,
         server_default=func.now(),
-        onupdate=func.now(),
+    )
+
+    # Updated every heartbeat
+    last_seen = Column(
+        DateTime,
+        nullable=True,
+        index=True,
     )
 
 
