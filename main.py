@@ -163,10 +163,11 @@ async def heartbeat(
     payload: RegistrationSchema,
     db: Session = Depends(get_db)
 ):
+    device_id = payload.device_id.strip().lower()
 
     device = (
-        db.query(Device)
-        .filter(Device.device_id == payload.device_id)
+        db.query(models.Device)
+        .filter(models.Device.device_id == device_id)
         .first()
     )
 
