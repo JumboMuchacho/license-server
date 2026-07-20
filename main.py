@@ -334,46 +334,45 @@ def consume_token(
             "message": "Already paid",
         }
 
-    device = (
+    # -------------------------------------------------------
+    # Atomic token deduction
+    # -------------------------------------------------------
+    updated = (
         db.query(models.Device)
-        .filter(models.Device.device_id == body.device_id)
-        .first()
+        .filter(
+            models.Device.device_id == body.device_id,
+            models.Device.token_balance > 0,
+        )
+        .update(
+            {
+                models.Device.token_balance:
+                    models.Device.token_balance - 1
+            },
+            synchronize_session=False,
+        )
     )
 
-    if not device or device.token_balance <= 0:
+    if updated != 1:
         raise HTTPException(
             status_code=403,
             detail="Insufficient balance",
         )
 
-   updated = (
-    db.query(Device)
-    .filter(
-        Device.device_id == body.device_id,
-        Device.token_balance > 0,
-    )
-    .update(
-        {
-            Device.token_balance:
-                Device.token_balance - 1
-        },
-        synchronize_session=False,
+    db.add(
+        models.ConsumedToken(
+            txn_id=body.txn_id,
+            device_id=body.device_id,
+        )
     )
 
-if updated != 1:
-    raise HTTPException(
-        status_code=409,
-        detail="Insufficient balance"
-    )
+    db.commit()
 
-db.add(
-    models.ConsumedToken(
-        txn_id=body.txn_id,
-        device_id=body.device_id,
+    # Reload device to get the updated balance
+    device = (
+        db.query(models.Device)
+        .filter(models.Device.device_id == body.device_id)
+        .first()
     )
-)
-
-db.commit()
 
     return {
         "success": True,
