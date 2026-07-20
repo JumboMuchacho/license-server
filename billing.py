@@ -14,3 +14,8 @@ class MpesaTransaction(Base):
     result_desc = Column(String, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
+
+TOKEN_PRICE = 10
+
+def calculate_amount(tokens: int) -> int:
+    return tokens * TOKEN_PRICE

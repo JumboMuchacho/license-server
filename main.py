@@ -346,16 +346,34 @@ def consume_token(
             detail="Insufficient balance",
         )
 
-    device.token_balance -= 1
-
-    db.add(
-        models.ConsumedToken(
-            txn_id=body.txn_id,
-            device_id=body.device_id,
-        )
+   updated = (
+    db.query(Device)
+    .filter(
+        Device.device_id == body.device_id,
+        Device.token_balance > 0,
+    )
+    .update(
+        {
+            Device.token_balance:
+                Device.token_balance - 1
+        },
+        synchronize_session=False,
     )
 
-    db.commit()
+if updated != 1:
+    raise HTTPException(
+        status_code=409,
+        detail="Insufficient balance"
+    )
+
+db.add(
+    models.ConsumedToken(
+        txn_id=body.txn_id,
+        device_id=body.device_id,
+    )
+)
+
+db.commit()
 
     return {
         "success": True,

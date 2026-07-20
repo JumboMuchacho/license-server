@@ -1,5 +1,4 @@
 import os
-import json
 import httpx
 import base64
 import logging
@@ -33,7 +32,10 @@ async def trigger_stk_push(
     party_b = os.getenv("MPESA_PARTY_B", "").strip() or business_shortcode
     passkey = os.getenv("MPESA_PASSKEY", "").strip()
     callback_url = os.getenv("MPESA_CALLBACK_URL", "").strip()
-    transaction_desc = os.getenv("MPESA_TRANSACTION_DESC", "Taptap Topup").strip()
+    transaction_desc = os.getenv(
+        "MPESA_TRANSACTION_DESC",
+        "Taptap Topup",
+    ).strip()
 
     if not all([business_shortcode, party_b, passkey, callback_url]):
         raise Exception(
@@ -49,7 +51,6 @@ async def trigger_stk_push(
 
     # ------------------------------------------------------------------
     # Password
-    # Password MUST ALWAYS use BusinessShortCode + Passkey + Timestamp
     # ------------------------------------------------------------------
     password = base64.b64encode(
         f"{business_shortcode}{passkey}{timestamp}".encode("utf-8")
@@ -78,27 +79,14 @@ async def trigger_stk_push(
     }
 
     # ------------------------------------------------------------------
-    # DEBUG LOGGING
+    # Production Logging
     # ------------------------------------------------------------------
-    logger.info("=" * 60)
-    logger.info("STK PUSH REQUEST")
-    logger.info("=" * 60)
-
-    logger.info(f"Endpoint: {url}")
-    logger.info(f"BusinessShortCode: {repr(business_shortcode)}")
-    logger.info(f"PartyB: {repr(party_b)}")
-    logger.info(f"Timestamp: {timestamp}")
-    logger.info(f"Password: {password}")
-    logger.info(f"PhoneNumber: {repr(phone_number)}")
-    logger.info(f"Amount: {amount}")
-    logger.info(f"Callback URL: {repr(callback_url)}")
-    logger.info(f"AccountReference: {repr(account_reference)}")
-    logger.info(f"TransactionDesc: {repr(transaction_desc)}")
-
-    logger.info("Payload:")
-    logger.info(json.dumps(payload, indent=4))
-
-    logger.info("=" * 60)
+    logger.info(
+        "STK Push | Phone=%s | Amount=%s | Account=%s",
+        phone_number,
+        amount,
+        account_reference,
+    )
 
     # ------------------------------------------------------------------
     # Send request
@@ -110,16 +98,24 @@ async def trigger_stk_push(
             headers=headers,
         )
 
-    # ------------------------------------------------------------------
-    # Response logging
-    # ------------------------------------------------------------------
-    logger.info("=" * 60)
-    logger.info("SAFARICOM RESPONSE")
-    logger.info("=" * 60)
-    logger.info(f"HTTP Status: {response.status_code}")
-    logger.info(response.text)
-    logger.info("=" * 60)
-
     response.raise_for_status()
+
+    response_json = response.json()
+
+    # ------------------------------------------------------------------
+    # Log Result
+    # ------------------------------------------------------------------
+    if response_json.get("ResponseCode") == "0":
+        logger.info(
+            "STK Accepted | Checkout=%s | Merchant=%s",
+            response_json.get("CheckoutRequestID"),
+            response_json.get("MerchantRequestID"),
+        )
+    else:
+        logger.warning(
+            "STK Rejected | Code=%s | Desc=%s",
+            response_json.get("ResponseCode"),
+            response_json.get("ResponseDescription"),
+        )
 
     return response
