@@ -1,5 +1,10 @@
+import os
 from database import Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
+try:
+    TOKEN_PRICE = int(os.getenv("TOKEN_PRICE", "20"))
+except ValueError:
+    raise RuntimeError("TOKEN_PRICE must be a valid integer.")
 
 class MpesaTransaction(Base):
     __tablename__ = "mpesa_transactions"
@@ -16,7 +21,6 @@ class MpesaTransaction(Base):
     created_at = Column(DateTime, server_default=func.now())
     completed_at = Column(DateTime, nullable=True)
 
-TOKEN_PRICE = 10
 
 def calculate_amount(tokens: int) -> int:
     return tokens * TOKEN_PRICE
