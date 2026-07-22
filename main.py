@@ -321,7 +321,7 @@ def consume_token(
     body: ConsumeTokenRequest,
     db: Session = Depends(get_db),
 ):
-
+        device_id = body.device_id.strip().lower()
     already_paid = (
         db.query(models.ConsumedToken)
         .filter(models.ConsumedToken.txn_id == body.txn_id)
