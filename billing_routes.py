@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from database import get_db, SessionLocal
-from billing import MpesaTransaction, calculate_amount
+from billing import (
+    MpesaTransaction,
+    calculate_amount,
+    TOKEN_PRICE,
+)
 import models
 import json
 import re
@@ -167,7 +171,7 @@ async def initiate_stk_push(
 
     logger.info(
         "TOKEN_PRICE=%s | Tokens=%s | Amount=%s",
-        os.getenv("TOKEN_PRICE"),
+        TOKEN_PRICE,
         clean_tokens,
         clean_amount,
     )
