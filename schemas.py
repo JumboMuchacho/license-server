@@ -5,8 +5,8 @@ class RegistrationSchema(BaseModel):
 
 class STKPushRequest(BaseModel):
     device_id: str
-    phone_number: int
-    amount: int
+    phone_number: str
+    tokens: int
 
 class ConsumeTokenRequest(BaseModel):
     device_id: str

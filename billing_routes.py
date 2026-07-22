@@ -83,7 +83,7 @@ def process_callback_data(data: dict):
             txn.status = "SUCCESS"
 
             if device:
-                tokens = int(amount / 10)
+                tokens = int(amount * 20)
                 device.token_balance += tokens
 
                 logger.info(
@@ -129,12 +129,22 @@ async def initiate_stk_push(
         # If the device identity is malicious or completely unverified, block them instantly
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
-    # --- SERVER SIDE PARSING & INPUT SANITIZATION ---
     try:
-        clean_phone = int(str(body.phone_number).strip().replace("+", ""))
-        clean_amount = int(body.amount)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload formatting data structure.")
+    clean_phone = str(body.phone_number).strip().replace("+", "")
+    clean_tokens = int(body.tokens)
+except (ValueError, TypeError):
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid payload."
+    )
+
+if clean_tokens <= 0:
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid token quantity."
+    )
+
+clean_amount = calculate_amount(clean_tokens)
 
     # --- TRIGGER M-PESA PIPELINE ---
     try:
@@ -154,8 +164,10 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-    logger.info(f"Safaricom HTTP Status: {response.status_code}")
-    logger.info(f"Safaricom Response: {response.text}")
+    logger.info(
+    "STK request accepted | Checkout=%s",
+    response_json.get("CheckoutRequestID"),
+)
 
     if response.status_code != 200:
         raise HTTPException(
@@ -175,7 +187,8 @@ async def initiate_stk_push(
     if "CheckoutRequestID" in resp_data:
         new_txn = MpesaTransaction(
             device_id=device.device_id,
-            phone_number=str(clean_phone),
+            phone_number=clean_phone,
+            tokens=clean_tokens,
             amount=clean_amount,
             status="PENDING",
             checkout_request_id=resp_data.get("CheckoutRequestID")

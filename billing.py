@@ -9,6 +9,7 @@ class MpesaTransaction(Base):
     mpesa_receipt_number = Column(String, nullable=True)
     phone_number = Column(String)
     amount = Column(Integer)
+    tokens = Column(Integer)
     status = Column(String, default="PENDING")
     result_code = Column(Integer, nullable=True)
     result_desc = Column(String, nullable=True)
