@@ -321,7 +321,8 @@ def consume_token(
     body: ConsumeTokenRequest,
     db: Session = Depends(get_db),
 ):
-        device_id = body.device_id.strip().lower()
+    device_id = body.device_id.strip().lower()
+
     already_paid = (
         db.query(models.ConsumedToken)
         .filter(models.ConsumedToken.txn_id == body.txn_id)
@@ -340,7 +341,7 @@ def consume_token(
     updated = (
         db.query(models.Device)
         .filter(
-            models.Device.device_id == body.device_id,
+            models.Device.device_id == device_id,
             models.Device.token_balance > 0,
         )
         .update(
@@ -361,7 +362,7 @@ def consume_token(
     db.add(
         models.ConsumedToken(
             txn_id=body.txn_id,
-            device_id=body.device_id,
+            device_id=device_id,
         )
     )
 
@@ -370,7 +371,7 @@ def consume_token(
     # Reload device to get the updated balance
     device = (
         db.query(models.Device)
-        .filter(models.Device.device_id == body.device_id)
+        .filter(models.Device.device_id == device_id)
         .first()
     )
 

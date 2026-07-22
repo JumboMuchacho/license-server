@@ -1,78 +1,143 @@
+from fastapi import APIRouter, Depends, Request, Header, HTTPException, BackgroundTasks
+from sqlalchemy.orm import Session
+from database import get_db, SessionLocal
+from billing import MpesaTransaction, calculate_amount
+import models
+import json
 import re
-# Amount paid
-amount = float(metadata_dict.get("Amount", 0))
+import logging
+from datetime import datetime, timezone
+from security_mpesa import verify_safaricom_ips as verify_safaricom_ip
+from services.mpesa_stk import trigger_stk_push
+from services.mpesa_auth import get_mpesa_access_token
+from schemas import STKPushRequest
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
-if result_code == 0:
+logger = logging.getLogger(__name__)
 
-    # Verify the callback amount matches what we expected
-    if amount != txn.amount:
-        txn.status = "FAILED"
-        txn.result_desc = (
-            f"Amount mismatch. Expected {txn.amount}, got {amount}"
+limiter = Limiter(key_func=get_remote_address)
+router = APIRouter(prefix="/api/v1/mpesa")
+
+def process_callback_data(data: dict):
+    db = SessionLocal()
+
+    try:
+        stk_callback = data.get("Body", {}).get("stkCallback", {})
+        checkout_id = stk_callback.get("CheckoutRequestID")
+        result_code = stk_callback.get("ResultCode")
+        result_desc = stk_callback.get("ResultDesc")
+
+        txn = (
+            db.query(MpesaTransaction)
+            .filter_by(checkout_request_id=checkout_id)
+            .first()
         )
 
-        logger.warning(
-            "Amount mismatch for %s. Expected %s, got %s",
-            checkout_id,
-            txn.amount,
-            amount,
-        )
+        if not txn:
+            logger.warning("No transaction found for %s", checkout_id)
+            return
+
+        if txn.status == "SUCCESS":
+            logger.info("Duplicate callback ignored for %s", checkout_id)
+            return
+
+        txn.result_code = result_code
+        txn.result_desc = result_desc
+
+        metadata = stk_callback.get("CallbackMetadata", {}).get("Item", [])
+        metadata_dict = {
+            item["Name"]: item.get("Value")
+            for item in metadata
+            if "Name" in item
+        }
+
+        txn.mpesa_receipt_number = metadata_dict.get("MpesaReceiptNumber")
+
+        transaction_date = metadata_dict.get("TransactionDate")
+
+        if transaction_date:
+            txn.completed_at = datetime.strptime(
+                str(transaction_date),
+                "%Y%m%d%H%M%S",
+            ).replace(tzinfo=timezone.utc)
+        else:
+            txn.completed_at = datetime.utcnow()
+
+        amount = int(float(metadata_dict.get("Amount", 0)))
+
+        if result_code == 0:
+            if amount != txn.amount:
+                txn.status = "FAILED"
+                txn.result_desc = (
+                    f"Amount mismatch. Expected {txn.amount}, got {amount}"
+                )
+
+                logger.warning(
+                    "Amount mismatch for %s. Expected %s, got %s",
+                    checkout_id,
+                    txn.amount,
+                    amount,
+                )
+
+                db.commit()
+                return
+
+            device = (
+                db.query(models.Device)
+                .filter(models.Device.device_id == txn.device_id)
+                .first()
+            )
+
+            txn.status = "SUCCESS"
+
+            if not device:
+                logger.warning(
+                    "Device %s not found for successful transaction %s",
+                    txn.device_id,
+                    checkout_id,
+                )
+            else:
+                device.token_balance += txn.tokens
+
+                logger.info(
+                    "Payment successful | Checkout=%s | Receipt=%s | Amount=KES %.0f | Tokens=%d | User=%s | Balance=%d",
+                    checkout_id,
+                    txn.mpesa_receipt_number,
+                    amount,
+                    txn.tokens,
+                    device.device_id,
+                    device.token_balance,
+                )
+
+        else:
+            txn.status = "FAILED"
+
+            logger.info(
+                "Payment failed | Checkout=%s | Result=%s | Desc=%s",
+                checkout_id,
+                result_code,
+                result_desc,
+            )
 
         db.commit()
-        return
 
-    # Associated device
-    device = (
-        db.query(models.Device)
-        .filter(models.Device.device_id == txn.device_id)
-        .first()
-    )
+    except Exception:
+        logger.exception("Error processing callback.")
+        db.rollback()
 
-    txn.status = "SUCCESS"
-
-    if not device:
-        logger.warning(
-            "Device %s not found for successful transaction %s",
-            txn.device_id,
-            checkout_id,
-        )
-    else:
-        device.token_balance += txn.tokens
-
-        logger.info(
-            "Payment successful | Checkout=%s | Receipt=%s | Amount=KES %.0f | Tokens=%d | User=%s | Balance=%d",
-            checkout_id,
-            txn.mpesa_receipt_number,
-            amount,
-            txn.tokens,
-            device.device_id,
-            device.token_balance,
-        )
-
-else:
-    txn.status = "FAILED"
-
-    logger.info(
-        "Payment failed | Checkout=%s | Result=%s | Desc=%s",
-        checkout_id,
-        result_code,
-        result_desc,
-    )
-
-db.commit()
+    finally:
+        db.close()
 
 @router.post("/stkpush")
-@limiter.limit("5/minute")  # Protects your API from bot-loops slamming your Safaricom budget
+@limiter.limit("5/minute")
 async def initiate_stk_push(
     body: STKPushRequest,
     request: Request,
     db: Session = Depends(get_db)
 ):
-    # --- SECURITY GATEKEEPER CHECK ---
-    # Validate Device directly against the database instead of client-side signing
     device = db.query(models.Device).filter(models.Device.device_id == body.device_id).first()
     if not device:
-        # If the device identity is malicious or completely unverified, block them instantly
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
     try:
@@ -84,7 +149,6 @@ async def initiate_stk_push(
             detail="Invalid payload."
         )
 
-    # Validate phone number
     if not re.fullmatch(r"2547\d{8}", clean_phone):
         raise HTTPException(
             status_code=400,
@@ -99,7 +163,8 @@ async def initiate_stk_push(
             detail="Invalid token package."
         )
 
-    # --- TRIGGER M-PESA PIPELINE ---
+    clean_amount = calculate_amount(clean_tokens)
+
     try:
         access_token = get_mpesa_access_token()
     except Exception as e:
@@ -117,12 +182,11 @@ async def initiate_stk_push(
         access_token=access_token
     )
 
-
     if response.status_code != 200:
         raise HTTPException(
             status_code=502,
             detail=f"Safaricom returned HTTP {response.status_code}: {response.text}"
-    )
+        )
 
     try:
         resp_data = response.json()
@@ -137,7 +201,6 @@ async def initiate_stk_push(
             detail=f"Safaricom returned invalid JSON: {response.text}"
         )
 
-    # --- HANDLE RESPONSE ---
     if "CheckoutRequestID" in resp_data:
         new_txn = MpesaTransaction(
             device_id=device.device_id,
@@ -153,17 +216,13 @@ async def initiate_stk_push(
     else:
         raise HTTPException(status_code=400, detail=f"Safaricom Error: {resp_data}")
 
-
 @router.post("/callback")
 async def mpesa_callback(
     request: Request,
     bg_tasks: BackgroundTasks
 ):
     try:
-        # Verify callback source
         await verify_safaricom_ip(request)
-
-        #logger.info(f"Headers: {dict(request.headers)}")
 
         data = await request.json()
 
