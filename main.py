@@ -187,7 +187,7 @@ async def heartbeat(
 
 @app.get("/api/v1/status")
 @limiter.limit("15/minute")
-def get_device_status(
+async def get_device_status(
     request: Request,
     device_id: str,
     db: Session = Depends(get_db)
@@ -199,6 +199,13 @@ def get_device_status(
             status_code=400,
             detail="Invalid device identifier."
         )
+
+    cache_key = f"status:{device_id}"
+
+    cached = await redis.get(cache_key)
+
+    if cached:
+        return json.loads(cached)
 
     device = (
         db.query(models.Device)
@@ -254,6 +261,13 @@ def get_device_status(
         ),
         "latest_payment_status": payment_status
     }
+    await redis.setex(
+        cache_key,
+        5,
+        json.dumps(response)
+    )
+
+    return response
 
 
 @app.post("/api/v1/rules")
@@ -383,9 +397,6 @@ def consume_token(
 # --- Static Files & Admin UI ---
 # This serves files from the 'admin' directory to the '/admin' route
 app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
-
-@app.get("/admin")
-async def get_admin():
-    return FileResponse("admin/index.html")
+app.mount("/website", StaticFiles(directory="website"), name="website")
 
 logger.info("Routes registered successfully.")

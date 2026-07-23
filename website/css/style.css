@@ -1,0 +1,502 @@
+/* ===========================================
+   GLOBAL
+=========================================== */
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+
+    font-family:
+        "Segoe UI",
+        Arial,
+        sans-serif;
+
+    background:
+        #07111f;
+
+    color:white;
+
+    line-height:1.6;
+
+}
+
+/* ===========================================
+   NAVBAR
+=========================================== */
+
+#navbar{
+
+    position:fixed;
+
+    top:0;
+
+    left:0;
+
+    width:100%;
+
+    height:75px;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:0 70px;
+
+    background:rgba(7,17,31,.75);
+
+    backdrop-filter:blur(14px);
+
+    border-bottom:1px solid rgba(255,255,255,.08);
+
+    z-index:999;
+
+}
+
+.logo{
+
+    font-size:28px;
+
+    font-weight:700;
+
+    color:#3b82f6;
+
+}
+
+nav{
+
+    display:flex;
+
+    gap:35px;
+
+}
+
+nav a{
+
+    color:white;
+
+    text-decoration:none;
+
+    transition:.3s;
+
+}
+
+nav a:hover{
+
+    color:#60a5fa;
+
+}
+
+.download-btn{
+
+    background:#3b82f6;
+
+    color:white;
+
+    text-decoration:none;
+
+    padding:12px 28px;
+
+    border-radius:12px;
+
+    transition:.3s;
+
+}
+
+.download-btn:hover{
+
+    transform:translateY(-2px);
+
+}
+
+/* ===========================================
+   HERO
+=========================================== */
+
+#hero{
+
+    min-height:100vh;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    padding:140px 80px;
+
+    gap:80px;
+
+}
+
+.hero-left{
+
+    width:55%;
+
+}
+
+.hero-left h1{
+
+    font-size:64px;
+
+    line-height:1.1;
+
+    margin-bottom:25px;
+
+}
+
+.hero-left p{
+
+    font-size:20px;
+
+    color:#b7c5d7;
+
+    margin-bottom:40px;
+
+}
+
+.hero-buttons{
+
+    display:flex;
+
+    gap:20px;
+
+}
+
+.hero-buttons button{
+
+    cursor:pointer;
+
+    border:none;
+
+    border-radius:14px;
+
+    padding:16px 34px;
+
+    font-size:17px;
+
+    transition:.3s;
+
+}
+
+.hero-buttons button:first-child{
+
+    background:#3b82f6;
+
+    color:white;
+
+}
+
+.hero-buttons button:last-child{
+
+    background:#162338;
+
+    color:white;
+
+}
+
+.hero-buttons button:hover{
+
+    transform:translateY(-4px);
+
+}
+
+/* ===========================================
+   BROWSER MOCKUP
+=========================================== */
+
+.browser-placeholder{
+
+    width:520px;
+
+    height:320px;
+
+    border-radius:18px;
+
+    background:#122033;
+
+    border:1px solid rgba(255,255,255,.08);
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    color:#6ea8ff;
+
+    font-size:24px;
+
+}
+
+.browser-preview{
+    width: 150%;
+    display: block;
+    border-radius: 18px;
+}
+
+/* ===========================================
+   SECTIONS
+=========================================== */
+
+section{
+
+    padding:120px 80px;
+
+}
+
+section h2{
+
+    text-align:center;
+
+    margin-bottom:60px;
+
+    font-size:42px;
+
+}
+
+/* ===========================================
+   FEATURE GRID
+=========================================== */
+
+.feature-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(3,1fr);
+
+    gap:35px;
+
+}
+
+.feature-card{
+
+    background:#101b2b;
+
+    border-radius:20px;
+
+    padding:35px;
+
+    transition:.35s;
+
+}
+
+.feature-card:hover{
+
+    transform:translateY(-8px);
+
+}
+
+.feature-card h3{
+
+    margin-bottom:18px;
+
+}
+
+/* ===========================================
+   HOW
+=========================================== */
+
+.steps{
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:25px;
+
+    font-size:26px;
+
+    flex-wrap:wrap;
+
+}
+
+/* ===========================================
+   PRICING
+=========================================== */
+
+.pricing-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(3,1fr);
+
+    gap:30px;
+
+}
+
+.price-card{
+
+    background:#101b2b;
+
+    border-radius:20px;
+
+    padding:35px;
+
+    text-align:center;
+
+    transition:.3s;
+
+}
+
+.price-card:hover{
+
+    transform:translateY(-8px);
+
+}
+
+.price-card h3{
+
+    font-size:30px;
+
+}
+
+.price-card p{
+
+    margin-top:15px;
+
+    font-size:24px;
+
+    color:#60a5fa;
+
+}
+
+/* ===========================================
+   SCREENSHOTS
+=========================================== */
+
+.screenshots{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:30px;
+
+    flex-wrap:wrap;
+
+}
+
+.shot{
+
+    width:320px;
+
+    height:200px;
+
+    border-radius:18px;
+
+    background:#122033;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+}
+
+/* ===========================================
+   FAQ
+=========================================== */
+
+.faq-item{
+
+    max-width:900px;
+
+    margin:30px auto;
+
+    padding:25px;
+
+    background:#101b2b;
+
+    border-radius:15px;
+
+}
+
+/* ===========================================
+   CONTACT
+=========================================== */
+
+#contact{
+
+    text-align:center;
+
+}
+
+#contact p{
+
+    margin:15px;
+
+    font-size:20px;
+
+}
+
+/* ===========================================
+   FOOTER
+=========================================== */
+
+footer{
+
+    text-align:center;
+
+    padding:40px;
+
+    border-top:1px solid rgba(255,255,255,.08);
+
+}
+
+footer a{
+
+    color:#60a5fa;
+
+    text-decoration:none;
+
+}
+
+/* Add this to your CSS for the Linear/Stripe-esque floating animation */
+.whatsapp-float {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+}
+
+.whatsapp-float a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  background: #0066FF;
+  color: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 102, 255, 0.25);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: floatPulse 3s ease-in-out infinite;
+}
+
+.whatsapp-float a:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(0, 102, 255, 0.35);
+}
+
+@keyframes floatPulse {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
