@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from redis.asyncio import Redis
 
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
@@ -46,6 +47,11 @@ from datetime import datetime, timezone, timedelta
 # ==========================
 
 load_dotenv()
+
+redis = Redis.from_url(
+    os.getenv("REDIS_URL"),
+    decode_responses=True,
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -248,26 +254,27 @@ async def get_device_status(
         and device.last_seen >= cutoff
     )
 
-    return {
-        "device_id": device.device_id,
-        "token_balance": device.token_balance,
-        "active": device.active,
-        "online": online,
-        "online_users": online_users,
-        "last_seen": (
-            device.last_seen.isoformat()
-            if device.last_seen
-            else None
-        ),
-        "latest_payment_status": payment_status
-    }
-    await redis.setex(
-        cache_key,
-        5,
-        json.dumps(response)
-    )
+    response = {
+    "device_id": device.device_id,
+    "token_balance": device.token_balance,
+    "active": device.active,
+    "online": online,
+    "online_users": online_users,
+    "last_seen": (
+        device.last_seen.isoformat()
+        if device.last_seen
+        else None
+    ),
+    "latest_payment_status": payment_status
+}
 
-    return response
+await redis.setex(
+    cache_key,
+    10,
+    json.dumps(response)
+)
+
+return response
 
 
 @app.post("/api/v1/rules")
