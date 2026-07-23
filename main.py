@@ -265,17 +265,16 @@ async def get_device_status(
         if device.last_seen
         else None
     ),
-    "latest_payment_status": payment_status
-}
+    "latest_payment_status": payment_status,
+    }
 
-await redis.setex(
+    await redis.setex(
     cache_key,
-    10,
-    json.dumps(response)
-)
+    5,
+    json.dumps(response),
+    )
 
-return response
-
+    return response
 
 @app.post("/api/v1/rules")
 @limiter.limit("20/minute")
