@@ -116,6 +116,10 @@ app.include_router(billing_router)
 async def google_site_verification():
     return FileResponse("website/googlefbfd14fed037e1f0.html")
 
+@app.get("/")
+async def landing_page():
+    return FileResponse("website/index.html")
+
 @app.get("/health")
 def health_check():
     return {
