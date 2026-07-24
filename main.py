@@ -400,6 +400,7 @@ def consume_token(
         "new_balance": device.token_balance,
     }
 
+
 # --- Static Files & Admin UI ---
 # This serves files from the 'admin' directory to the '/admin' route
 app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
