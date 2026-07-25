@@ -120,6 +120,14 @@ async def google_site_verification():
 async def landing_page():
     return FileResponse("website/index.html")
 
+@app.get("/privacy")
+async def privacy():
+    return FileResponse("website/privacy.html")
+
+@app.get("/terms")
+async def terms():
+    return FileResponse("website/terms.html")
+
 @app.get("/health")
 def health_check():
     return {
