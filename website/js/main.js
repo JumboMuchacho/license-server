@@ -67,7 +67,7 @@ document.querySelectorAll('nav a').forEach(anchor=>{
 // Download Button
 // ================================
 
-document.getElementById("downloadButton")
+document.querySelectorAll(".download-btn")
 
 .addEventListener("click",()=>{
 
