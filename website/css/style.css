@@ -28,6 +28,52 @@ body{
 
 }
 
+@media (max-width:1100px){
+
+#hero{
+
+    flex-direction:column;
+
+    text-align:center;
+
+    padding:120px 30px 60px;
+
+    gap:40px;
+
+}
+
+.hero-left{
+
+    width:100%;
+
+}
+
+.hero-right{
+
+    width:100%;
+
+}
+
+.browser-placeholder{
+
+    max-width:600px;
+
+}
+
+.browser-preview{
+
+    width:100%;
+
+}
+
+.hero-buttons{
+
+    justify-content:center;
+
+}
+
+}
+
 /* ===========================================
    NAVBAR
 =========================================== */
@@ -134,19 +180,32 @@ nav a:hover{
 
     padding:140px 80px;
 
-    gap:80px;
+    gap:50px;
 
 }
 
 .hero-left{
 
-    width:55%;
+    flex:1;
+    min-width:320
+
+}
+
+.hero-right{
+
+    flex:1;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
 
 }
 
 .hero-left h1{
 
-    font-size:64px;
+    font-size:clamp(2.8rem,5vw,4.2rem);
 
     line-height:1.1;
 
@@ -216,35 +275,67 @@ nav a:hover{
 
 .browser-placeholder{
 
-    width:520px;
+    width:100%;
 
-    height:320px;
-
-    border-radius:18px;
-
-    background:#122033;
-
-    border:1px solid rgba(255,255,255,.08);
+    max-width:650px;
 
     display:flex;
 
-    align-items:center;
-
     justify-content:center;
 
-    color:#6ea8ff;
+    align-items:center;
 
-    font-size:24px;
+    background:transparent;
+
+    border:none;
+
+    box-shadow:none;
 
 }
 
 .browser-preview{
-    width: 150%;
-    display: block;
-    border-radius: 18px;
+
+    width:100%;
+
+    max-width:650px;
+
+    height:auto;
+
+    display:block;
+
+    border-radius:18px;
+
+    object-fit:contain;
+
 }
 
+.pricing-note{
 
+    margin-top:45px;
+
+    text-align:center;
+
+    color:#a9b8cc;
+
+    font-size:16px;
+
+    line-height:1.7;
+
+    max-width:700px;
+
+    margin-left:auto;
+
+    margin-right:auto;
+
+    padding:16px 24px;
+
+    border:1px solid rgba(255,255,255,.08);
+
+    border-radius:14px;
+
+    background:rgba(255,255,255,.03);
+
+}
 /* ----------------------------- */
 /* Setup Section */
 /* ----------------------------- */
