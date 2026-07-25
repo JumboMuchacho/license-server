@@ -1,3 +1,30 @@
+/* ==========================================
+   DESIGN SYSTEM
+========================================== */
+
+:root{
+
+    --bg:#07111f;
+    --surface:#101b2b;
+    --surface-light:#162338;
+
+    --primary:#3b82f6;
+    --primary-hover:#60a5fa;
+
+    --text:#ffffff;
+    --text-secondary:#b7c5d7;
+
+    --border:rgba(255,255,255,.08);
+
+    --shadow:
+        0 15px 45px rgba(0,0,0,.28);
+
+    --radius:18px;
+
+    --max-width:1200px;
+
+}
+
 /* ===========================================
    GLOBAL
 =========================================== */
@@ -6,6 +33,20 @@
     margin:0;
     padding:0;
     box-sizing:border-box;
+}
+
+:root{
+    --primary:#3b82f6;
+    --bg:#07111f;
+    --card:#101b2b;
+    --text:#ffffff;
+    --muted:#b7c5d7;
+
+    --radius:18px;
+
+    --shadow:0 20px 50px rgba(0,0,0,.25);
+
+    --transition:.35s ease;
 }
 
 html{
@@ -19,12 +60,21 @@ body{
         Arial,
         sans-serif;
 
-    background:
-        #07111f;
+    background:var(--bg);
 
-    color:white;
+    color:var(--text);
 
-    line-height:1.6;
+    line-height:1.7;
+
+    overflow-x:hidden;
+
+}
+
+.container{
+
+    width:min(1200px,92%);
+
+    margin:auto;
 
 }
 
@@ -32,17 +82,36 @@ body{
    NAVBAR
 =========================================== */
 
-#navbar{
-
+header{
     position:fixed;
-
     top:0;
-
     left:0;
-
     width:100%;
+    z-index:1000;
 
-    height:75px;
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+
+    background:rgba(8,12,20,.72);
+
+    border-bottom:1px solid rgba(255,255,255,.05);
+
+    transition:
+        background .35s ease,
+        padding .35s ease,
+        border-color .35s ease;
+}
+
+header.scrolled{
+    background:rgba(8,12,20,.92);
+    border-bottom:1px solid rgba(59,130,246,.15);
+}
+
+.header-container{
+
+    max-width:1200px;
+
+    margin:auto;
 
     display:flex;
 
@@ -50,73 +119,69 @@ body{
 
     align-items:center;
 
-    padding:0 70px;
-
-    background:rgba(7,17,31,.75);
-
-    backdrop-filter:blur(14px);
-
-    border-bottom:1px solid rgba(255,255,255,.08);
-
-    z-index:999;
-
+    padding:18px 32px;
 }
 
 .logo{
 
-    font-size:28px;
+    font-size:1.45rem;
 
     font-weight:700;
 
-    color:#3b82f6;
+    color:#fff;
 
+    letter-spacing:.5px;
 }
 
 nav{
 
     display:flex;
 
-    gap:35px;
+    align-items:center;
 
+    gap:36px;
 }
 
 nav a{
 
-    color:white;
+    color:#d1d5db;
 
     text-decoration:none;
 
-    transition:.3s;
+    font-size:.95rem;
 
+    transition:.25s;
 }
 
 nav a:hover{
 
-    color:#60a5fa;
-
+    color:#fff;
 }
 
 .download-btn{
 
-    background:#3b82f6;
-
-    color:white;
-
-    text-decoration:none;
-
-    padding:12px 28px;
+    padding:12px 22px;
 
     border-radius:12px;
 
-    transition:.3s;
+    background:#3b82f6;
 
+    color:#fff;
+
+    text-decoration:none;
+
+    font-weight:600;
+
+    transition:.25s;
 }
 
 .download-btn:hover{
 
     transform:translateY(-2px);
 
+    box-shadow:0 10px 30px rgba(59,130,246,.35);
 }
+
 
 /* ===========================================
    HERO
@@ -132,82 +197,151 @@ nav a:hover{
 
     justify-content:space-between;
 
-    padding:140px 80px;
+    gap:90px;
 
-    gap:80px;
+    padding-top:140px;
 
+    padding-bottom:80px;
 }
 
 .hero-left{
 
-    width:55%;
+    flex:1;
 
+    max-width:620px;
 }
 
 .hero-left h1{
 
-    font-size:64px;
+    font-size:clamp(2.8rem,6vw,4.8rem);
 
-    line-height:1.1;
+    line-height:1.05;
 
-    margin-bottom:25px;
+    margin-bottom:26px;
 
+    letter-spacing:-2px;
 }
 
 .hero-left p{
 
-    font-size:20px;
+    font-size:1.08rem;
 
-    color:#b7c5d7;
+    line-height:1.9;
+
+    color:#b6c2d1;
 
     margin-bottom:40px;
-
 }
 
 .hero-buttons{
 
     display:flex;
 
-    gap:20px;
+    flex-wrap:wrap;
 
+    gap:18px;
 }
 
 .hero-buttons button{
 
-    cursor:pointer;
-
     border:none;
 
-    border-radius:14px;
+    cursor:pointer;
 
     padding:16px 34px;
 
-    font-size:17px;
+    border-radius:14px;
 
-    transition:.3s;
+    font-size:1rem;
 
+    font-weight:600;
+
+    transition:.3s ease;
 }
 
 .hero-buttons button:first-child{
 
     background:#3b82f6;
 
-    color:white;
+    color:#fff;
 
+    box-shadow:0 15px 40px rgba(59,130,246,.25);
+}
+
+.hero-buttons button:first-child:hover{
+
+    transform:translateY(-4px);
+
+    box-shadow:0 22px 50px rgba(59,130,246,.45);
 }
 
 .hero-buttons button:last-child{
 
-    background:#162338;
+    background:#141b28;
 
-    color:white;
+    color:#fff;
 
+    border:1px solid rgba(255,255,255,.08);
 }
 
-.hero-buttons button:hover{
+.hero-buttons button:last-child:hover{
+
+    background:#1a2433;
 
     transform:translateY(-4px);
+}
 
+
+/* ===========================================
+   HERO RIGHT
+=========================================== */
+
+.hero-right{
+
+    flex:1;
+
+    display:flex;
+
+    justify-content:flex-end;
+
+    align-items:center;
+}
+
+.browser-placeholder{
+
+    width:min(560px,100%);
+
+    position:relative;
+}
+
+.browser-placeholder::before{
+
+    content:"";
+
+    position:absolute;
+
+    inset:-40px;
+
+    background:radial-gradient(circle,
+        rgba(59,130,246,.30),
+        transparent 70%);
+
+    filter:blur(35px);
+
+    z-index:-1;
+}
+
+.browser-preview{
+
+    width:100%;
+
+    display:block;
+
+    border-radius:18px;
+
+    box-shadow:
+        0 35px 90px rgba(0,0,0,.45),
+        0 0 60px rgba(59,130,246,.10);
 }
 
 /* ===========================================
@@ -216,11 +350,13 @@ nav a:hover{
 
 .browser-placeholder{
 
-    width:520px;
+    width:100%;
 
-    height:320px;
+    max-width:600px;
 
-    border-radius:18px;
+    height:auto;
+
+    border-radius:var(--radius);
 
     background:#122033;
 
@@ -239,9 +375,16 @@ nav a:hover{
 }
 
 .browser-preview{
-    width: 150%;
-    display: block;
-    border-radius: 18px;
+
+    width:100%;
+
+    max-width:600px;
+
+    height:auto;
+
+    display:block;
+
+    border-radius:18px;
 }
 
 /* ===========================================
@@ -250,7 +393,7 @@ nav a:hover{
 
 section{
 
-    padding:120px 80px;
+    padding:110px 0;
 
 }
 
@@ -258,9 +401,27 @@ section h2{
 
     text-align:center;
 
-    margin-bottom:60px;
+    font-size:clamp(2rem,5vw,3rem);
 
-    font-size:42px;
+    margin-bottom:70px;
+
+    font-weight:700;
+
+    letter-spacing:-1px;
+
+}
+
+p{
+
+    color:var(--text-secondary);
+
+}
+
+img{
+
+    max-width:100%;
+
+    display:block;
 
 }
 
@@ -387,7 +548,7 @@ section h2{
 
     background:#101b2b;
 
-    border-radius:18px;
+    border-radius:var(--radius);
 
     overflow:hidden;
 
@@ -467,7 +628,7 @@ section h2{
 
     border:1px solid rgba(255,255,255,.06);
 
-    border-radius:18px;
+    border-radius:var(--radius);
 
     overflow:hidden;
 

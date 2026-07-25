@@ -116,10 +116,6 @@ app.include_router(billing_router)
 async def google_site_verification():
     return FileResponse("website/googlefbfd14fed037e1f0.html")
 
-@app.get("/")
-async def landing_page():
-    return FileResponse("website/index.html")
-
 @app.get("/health")
 def health_check():
     return {
@@ -412,6 +408,10 @@ def consume_token(
 # --- Static Files & Admin UI ---
 # This serves files from the 'admin' directory to the '/admin' route
 app.mount("/admin", StaticFiles(directory="admin", html=True), name="admin")
-app.mount("/website", StaticFiles(directory="website"), name="website")
+app.mount(
+    "/",
+    StaticFiles(directory="website", html=True),
+    name="website"
+)
 
 logger.info("Routes registered successfully.")
