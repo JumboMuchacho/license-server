@@ -71,7 +71,7 @@ document.querySelectorAll(".download-btn")
 
 .addEventListener("click",()=>{
 
-    window.location="/downloads/TapTap.crx";
+    window.location="/downloads/TapTap3.0.zip"
 
 });
 
