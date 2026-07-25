@@ -74,3 +74,47 @@ document.getElementById("downloadButton")
     window.location="/downloads/TapTap.crx";
 
 });
+
+const modal = document.getElementById("imageModal");
+const modalImg = document.getElementById("modalImage");
+const closeBtn = document.querySelector(".close-modal");
+
+document.querySelectorAll(".setup-lightbox").forEach(item => {
+
+    item.addEventListener("click", function(e){
+
+        e.preventDefault();
+
+        modal.style.display = "flex";
+
+        modalImg.src = this.href;
+
+    });
+
+});
+
+closeBtn.onclick = () => {
+
+    modal.style.display = "none";
+
+};
+
+modal.onclick = (e)=>{
+
+    if(e.target===modal){
+
+        modal.style.display="none";
+
+    }
+
+};
+
+document.addEventListener("keydown",(e)=>{
+
+    if(e.key==="Escape"){
+
+        modal.style.display="none";
+
+    }
+
+});

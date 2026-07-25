@@ -244,6 +244,139 @@ nav a:hover{
     border-radius: 18px;
 }
 
+
+/* ----------------------------- */
+/* Setup Section */
+/* ----------------------------- */
+
+.setup-section{
+
+    padding:120px 0;
+
+    background:#111827;
+
+}
+
+.setup-section h2{
+
+    text-align:center;
+
+    font-size:42px;
+
+    margin-bottom:15px;
+
+}
+
+.setup-intro{
+
+    text-align:center;
+
+    color:#a6b0cf;
+
+    max-width:700px;
+
+    margin:auto;
+
+    margin-bottom:70px;
+
+    line-height:1.8;
+
+}
+
+.setup-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
+
+    gap:45px;
+
+}
+
+.setup-card{
+
+    text-align:center;
+
+}
+
+.setup-card h3{
+
+    margin-bottom:18px;
+
+    color:#ff4040;
+
+    letter-spacing:1px;
+
+    font-size:24px;
+
+}
+
+.setup-image{
+
+    overflow:hidden;
+
+    border-radius:20px;
+
+    height:600px;
+
+    box-shadow:0 15px 45px rgba(0,0,0,.35);
+
+    transition:.45s;
+
+    cursor:pointer;
+
+}
+
+.setup-image img{
+
+    width:100%;
+
+    display:block;
+
+    transition:.55s;
+
+    transform:translateY(0);
+
+}
+
+/* only reveal about 75% */
+
+.setup-image{
+
+    clip-path: inset(0 0 25% 0);
+
+}
+
+/* hover */
+
+.setup-image:hover{
+
+    clip-path: inset(0);
+
+    transform:translateY(-10px);
+
+    box-shadow:0 30px 60px rgba(0,0,0,.45);
+
+}
+
+.setup-image:hover img{
+
+    transform:scale(1.03);
+
+}
+
+.setup-card p{
+
+    margin-top:22px;
+
+    color:#bfc6db;
+
+    line-height:1.8;
+
+    font-size:16px;
+
+}
+
 /* ===========================================
    SECTIONS
 =========================================== */
