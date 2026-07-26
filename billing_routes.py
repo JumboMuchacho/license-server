@@ -159,7 +159,7 @@ async def initiate_stk_push(
             detail="Phone number must be in 2547XXXXXXXX format."
         )
 
-    ALLOWED_TOKEN_PACKAGES = {5, 10, 20, 40, 80, 160, 320, 640}
+    ALLOWED_TOKEN_PACKAGES = {1, 2, 5, 10, 20, 40, 80, 160, 320, 640}
 
     if clean_tokens not in ALLOWED_TOKEN_PACKAGES:
         raise HTTPException(
