@@ -170,7 +170,7 @@ async def initiate_stk_push(
         )
 
     if clean_tokens not in TOKEN_PRICES:
-    raise HTTPException(
+        raise HTTPException(
         status_code=400,
         detail="Invalid token package."
     )
