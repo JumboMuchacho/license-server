@@ -1,4 +1,3 @@
-import os
 from database import Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
 
@@ -45,4 +44,4 @@ def calculate_amount(tokens: int) -> int:
     try:
         return TOKEN_PRICES[int(tokens)]
     except (KeyError, ValueError, TypeError):
-        raise ValueError(f"Unsupported token package: {tokens}")
+        raise ValueError(f"Unsupported token package: {tokens}") from e
