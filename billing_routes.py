@@ -4,6 +4,7 @@ from database import get_db, SessionLocal
 from billing import (
     MpesaTransaction,
     calculate_amount,
+    TOKEN_PRICES
 )
 import models
 import json
@@ -144,7 +145,13 @@ async def initiate_stk_push(
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
     try:
-        clean_phone = str(body.phone_number).strip().replace(" ", "").replace("-", "").replace("+", "")
+        clean_phone = (
+            str(body.phone_number)
+            .strip()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("+", "")
+        )
         clean_tokens = int(body.tokens)
     except (ValueError, TypeError):
         raise HTTPException(
@@ -152,26 +159,26 @@ async def initiate_stk_push(
             detail="Invalid payload."
         )
 
-    # Validate the final format
+    if re.fullmatch(r"0(7|1)\d{8}", clean_phone):
+        clean_phone = "254" + clean_phone[1:]
+
+# Validate the normalized number
     if not re.fullmatch(r"254(7|1)\d{8}", clean_phone):
         raise HTTPException(
-            status_code=400,
-            detail="Enter a valid Kenyan phone number."
+        status_code=400,
+        detail="Enter a valid Kenyan phone number."
         )
 
-    ALLOWED_TOKEN_PACKAGES = {1, 2, 5, 10, 20, 40, 80, 160, 320, 640}
-
-    if clean_tokens not in ALLOWED_TOKEN_PACKAGES:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid token package."
-        )
+    if clean_tokens not in TOKEN_PRICES:
+    raise HTTPException(
+        status_code=400,
+        detail="Invalid token package."
+    )
 
     clean_amount = int(calculate_amount(clean_tokens))
 
     logger.info(
-        "TOKEN_PRICE=%s | Tokens=%s | Amount=%s",
-        TOKEN_PRICE,
+        "Package purchase | Tokens=%s | Amount=%s",
         clean_tokens,
         clean_amount,
     )
