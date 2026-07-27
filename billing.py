@@ -1,13 +1,11 @@
 import os
 from database import Base
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
-try:
-    TOKEN_PRICE = int(os.getenv("TOKEN_PRICE", "20"))
-except ValueError:
-    raise RuntimeError("TOKEN_PRICE must be a valid integer.")
+
 
 class MpesaTransaction(Base):
     __tablename__ = "mpesa_transactions"
+
     id = Column(Integer, primary_key=True)
     device_id = Column(String, ForeignKey("devices.device_id"), index=True)
     checkout_request_id = Column(String, unique=True, index=True)
@@ -22,5 +20,29 @@ class MpesaTransaction(Base):
     completed_at = Column(DateTime, nullable=True)
 
 
+# Token package pricing (KES)
+TOKEN_PRICES = {
+    1: 40,
+    2: 70,
+    5: 160,
+    10: 300,
+    20: 600,
+    40: 1200,
+    80: 2400,
+    160: 4400,
+    320: 9000,
+    640: 16000,
+}
+
+
 def calculate_amount(tokens: int) -> int:
-    return tokens * TOKEN_PRICE
+    """
+    Returns the purchase price for a token package.
+
+    Raises:
+        ValueError: If an unsupported token package is requested.
+    """
+    try:
+        return TOKEN_PRICES[int(tokens)]
+    except (KeyError, ValueError, TypeError):
+        raise ValueError(f"Unsupported token package: {tokens}")

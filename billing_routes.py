@@ -145,7 +145,7 @@ async def initiate_stk_push(
         raise HTTPException(status_code=403, detail="Unauthorized Device Identity.")
 
     try:
-        clean_phone = str(body.phone_number).strip().replace("+", "")
+        clean_phone = str(body.phone_number).strip().replace(" ", "").replace("-", "").replace("+", "")
         clean_tokens = int(body.tokens)
     except (ValueError, TypeError):
         raise HTTPException(
@@ -153,10 +153,11 @@ async def initiate_stk_push(
             detail="Invalid payload."
         )
 
-    if not re.fullmatch(r"2547\d{8}", clean_phone):
+    # Validate the final format
+    if not re.fullmatch(r"254(7|1)\d{8}", clean_phone):
         raise HTTPException(
             status_code=400,
-            detail="Phone number must be in 2547XXXXXXXX format."
+            detail="Enter a valid Kenyan phone number."
         )
 
     ALLOWED_TOKEN_PACKAGES = {1, 2, 5, 10, 20, 40, 80, 160, 320, 640}
