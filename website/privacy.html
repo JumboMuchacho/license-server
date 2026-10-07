@@ -3,399 +3,894 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="TapTap Privacy Policy - how Batman Tech collects, uses, stores, protects, and shares information.">
-    <title>TapTap - Privacy Policy</title>
+
+    <title>TapTap Privacy Policy | Batman Tech</title>
+
+    <meta
+        name="description"
+        content="TapTap Privacy Policy - Information about data collection, use, storage, security, and sharing."
+    >
+
     <style>
-        :root {
-            --bg: #0b1020;
-            --card: #121a2d;
-            --text: #e9eefb;
-            --muted: #aab5cc;
-            --accent: #00cfae;
-            --border: #26324b;
+        * {
+            box-sizing: border-box;
         }
 
-        * { box-sizing: border-box; }
+        html {
+            scroll-behavior: smooth;
+        }
 
         body {
             margin: 0;
-            background: var(--bg);
-            color: var(--text);
+            padding: 0;
             font-family: Arial, Helvetica, sans-serif;
             line-height: 1.7;
+            color: #222;
+            background: #f5f7fa;
         }
 
-        .container {
-            width: min(900px, calc(100% - 32px));
+        .header {
+            background: #111827;
+            color: white;
+            padding: 45px 20px;
+        }
+
+        .header-content {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 48px 0 64px;
-        }
-
-        header {
-            margin-bottom: 28px;
         }
 
         .brand {
-            color: var(--accent);
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 1.5px;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 1px;
             text-transform: uppercase;
+            opacity: 0.8;
+            margin-bottom: 10px;
         }
 
         h1 {
-            margin: 8px 0;
-            font-size: clamp(32px, 6vw, 48px);
-            line-height: 1.15;
+            margin: 0 0 10px;
+            font-size: 36px;
+            line-height: 1.2;
+        }
+
+        .effective-date {
+            margin: 0;
+            color: #d1d5db;
+            font-size: 15px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .content {
+            background: white;
+            padding: 45px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
         }
 
         h2 {
-            margin-top: 34px;
-            color: #ffffff;
-            font-size: 22px;
+            margin-top: 42px;
+            margin-bottom: 14px;
+            color: #111827;
+            font-size: 24px;
+            line-height: 1.3;
         }
 
-        p, li {
-            color: var(--muted);
+        h3 {
+            margin-top: 28px;
+            margin-bottom: 10px;
+            color: #1f2937;
+            font-size: 19px;
         }
 
-        .updated {
-            color: var(--muted);
-            font-size: 14px;
+        h2:first-child {
+            margin-top: 0;
         }
 
-        .card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 28px;
+        p {
+            margin: 0 0 16px;
         }
 
-        a {
-            color: var(--accent);
+        ul,
+        ol {
+            margin-top: 8px;
+            margin-bottom: 20px;
+            padding-left: 25px;
+        }
+
+        li {
+            margin-bottom: 7px;
         }
 
         strong {
-            color: #ffffff;
+            color: #111827;
         }
 
-        ul {
-            padding-left: 24px;
+        .intro {
+            background: #f3f4f6;
+            border-left: 4px solid #111827;
+            padding: 18px 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
         }
 
         .contact {
-            border-left: 3px solid var(--accent);
-            padding-left: 16px;
+            background: #f3f4f6;
+            padding: 22px;
+            border-radius: 8px;
+            margin-top: 20px;
         }
 
-        footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-            color: var(--muted);
-            font-size: 13px;
+        .footer {
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            padding: 30px 20px 45px;
         }
 
-        .back {
-            display: inline-block;
-            margin-top: 18px;
+        a {
+            color: #2563eb;
             text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 650px) {
+            .header {
+                padding: 35px 18px;
+            }
+
+            h1 {
+                font-size: 29px;
+            }
+
+            .container {
+                margin: 20px auto;
+                padding: 0 12px;
+            }
+
+            .content {
+                padding: 25px 20px;
+                border-radius: 8px;
+            }
+
+            h2 {
+                font-size: 21px;
+                margin-top: 35px;
+            }
+
+            h3 {
+                font-size: 18px;
+            }
         }
     </style>
 </head>
 
 <body>
-<main class="container">
-    <header>
+
+<header class="header">
+    <div class="header-content">
         <div class="brand">Batman Tech</div>
         <h1>TapTap Privacy Policy</h1>
-        <div class="updated"><strong>Effective Date:</strong> October 1, 2026</div>
-    </header>
+        <p class="effective-date">
+            Effective Date: October 7, 2026
+        </p>
+    </div>
+</header>
 
-    <div class="card">
+<main class="container">
+    <article class="content">
+
+        <div class="intro">
+            <strong>About this policy:</strong>
+            This Privacy Policy explains how TapTap collects, processes, uses,
+            stores, protects, and shares information when you use the TapTap
+            browser extension and related services.
+        </div>
+
         <p>
-            TapTap ("TapTap", "the Extension", "we", "us", or "our") is developed and
-            operated by <strong>Batman Tech</strong>.
+            TapTap ("TapTap", "the Extension", "we", "us", or "our") is
+            developed and operated by <strong>Batman Tech</strong>.
         </p>
 
         <p>
-            This Privacy Policy explains what information TapTap collects or processes,
-            why that information is used, how it is stored and protected, when it may be
-            shared, how long it may be retained, and the choices available to users.
+            TapTap is a token-based browser extension that monitors a specific
+            supported website, communicates with Batman Tech's backend service,
+            and uses account and token information to determine whether its
+            notification functionality is authorized.
         </p>
+
 
         <h2>1. Information We Collect and Process</h2>
 
         <p>
-            TapTap collects or processes information that is reasonably necessary to
-            provide its account, licensing, token, payment, monitoring, and support
-            functionality.
+            TapTap processes information that is necessary to provide its
+            account, device registration, token, payment, website-monitoring,
+            notification, security, and support functionality.
         </p>
 
-        <p><strong>Account and licensing information may include:</strong></p>
-        <ul>
-            <li>Email address associated with a TapTap account.</li>
-            <li>Account or activation status.</li>
-            <li>License or account identifier.</li>
-            <li>Device or installation identifier used to associate an extension installation with an account.</li>
-        </ul>
+        <h3>1.1 Email Address and Account Identifier</h3>
 
-        <p><strong>Service and token information may include:</strong></p>
-        <ul>
-            <li>Token balance.</li>
-            <li>Token consumption records.</li>
-            <li>License validation and synchronization information.</li>
-            <li>Information necessary to prevent duplicate or unauthorized token use.</li>
-        </ul>
+        <p>
+            When you connect TapTap to an account, you provide an email address.
+        </p>
 
-        <p><strong>Payment information may include:</strong></p>
+        <p>TapTap may process:</p>
+
         <ul>
-            <li>Payment transaction reference.</li>
-            <li>Payment amount.</li>
-            <li>Payment status.</li>
-            <li>The TapTap account or license associated with a payment.</li>
+            <li>Email address.</li>
+            <li>Account/device identifier.</li>
+            <li>Account registration status.</li>
+            <li>Account activity status.</li>
+            <li>License or service status.</li>
         </ul>
 
         <p>
-            TapTap does not collect or store users' M-Pesa PINs, bank passwords, or
-            other banking authentication credentials.
+            <strong>How it is collected:</strong>
+            The email address is entered by the user into the TapTap extension
+            and sent to the TapTap backend when the user registers or
+            synchronizes the extension.
         </p>
-
-        <h2>2. Information Stored Locally by the Extension</h2>
 
         <p>
-            TapTap uses Chrome's extension storage facilities to store information
-            required for the extension to function. This may include:
+            <strong>How it is used:</strong>
+            The email address is used to identify the user's TapTap account,
+            associate token balances with the account, authorize service
+            functionality, and provide support.
         </p>
 
+        <p>
+            <strong>Where it is stored:</strong>
+            Account information may be stored on Batman Tech's backend
+            infrastructure and database services.
+        </p>
+
+
+        <h2>2. Device and Installation Information</h2>
+
+        <p>
+            TapTap generates and processes an identifier associated with an
+            extension installation and account.
+        </p>
+
+        <p>This information may include:</p>
+
         <ul>
-            <li>Account information required by the extension.</li>
-            <li>Activation or license status.</li>
             <li>Device or installation identifier.</li>
-            <li>Extension preferences.</li>
-            <li>Monitoring settings.</li>
-            <li>Page-refresh or auto-refresh settings.</li>
+            <li>Account identifier.</li>
+            <li>Registration timestamp.</li>
+            <li>Last-seen or heartbeat information.</li>
+            <li>Activation status.</li>
+            <li>Service status.</li>
         </ul>
 
         <p>
-            Locally stored extension information remains within the extension's storage
-            environment on the user's device. Users can remove local extension data by
-            uninstalling the extension or clearing its stored data through Chrome.
+            This information is used to identify an installation, maintain
+            service availability, associate token usage with the correct
+            account, prevent unauthorized or duplicate token use, and maintain
+            the reliability and security of the service.
         </p>
-
-        <h2>3. Information We Do Not Collect</h2>
 
         <p>
-            TapTap does not intentionally collect the following information:
+            TapTap does not intentionally collect a user's precise physical
+            location.
         </p>
+
+
+        <h2>3. Token and Service Information</h2>
+
+        <p>
+            TapTap processes token-related information required to provide its
+            token-based service.
+        </p>
+
+        <p>This may include:</p>
 
         <ul>
-            <li>M-Pesa PINs.</li>
-            <li>Banking passwords or banking authentication credentials.</li>
-            <li>Private messages.</li>
-            <li>Personal files stored on the user's computer.</li>
-            <li>Browsing history unrelated to TapTap's supported website.</li>
-            <li>Unrelated website content.</li>
-            <li>Precise physical location information.</li>
+            <li>Current token balance.</li>
+            <li>Token consumption.</li>
+            <li>Token consumption records.</li>
+            <li>Transaction identifiers used for token authorization.</li>
+            <li>License or activation status.</li>
+            <li>Service activity status.</li>
         </ul>
+
+        <p>
+            When TapTap detects a supported transaction on the monitored
+            website, it sends the relevant transaction identifier and account
+            identifier to the TapTap backend.
+        </p>
+
+        <p>
+            The backend determines whether the transaction is authorized and
+            whether a token may be consumed.
+        </p>
+
+        <p>
+            TapTap's notification/alarm functionality is activated only after
+            the server authorizes the relevant transaction.
+        </p>
+
+        <p>Token information is used to:</p>
+
+        <ul>
+            <li>Determine whether the user has available tokens.</li>
+            <li>Authorize service usage.</li>
+            <li>Record token consumption.</li>
+            <li>Prevent duplicate token consumption.</li>
+            <li>Maintain account balances.</li>
+            <li>Provide TapTap monitoring and notification services.</li>
+        </ul>
+
 
         <h2>4. Website Monitoring</h2>
 
         <p>
-            TapTap operates on supported websites for which the extension is intended
-            to provide its functionality.
+            TapTap is designed to operate on the supported website:
         </p>
 
         <p>
-            The extension monitors relevant page content only to detect information
-            necessary for its intended service, such as transaction or deposit
-            information required to trigger the authorized notification feature.
+            <strong>
+                https://www.gamemania.co.ke/
+            </strong>
         </p>
 
         <p>
-            TapTap does not intentionally monitor unrelated websites or collect
-            unrelated browsing information.
+            The Extension's website-monitoring functionality operates only on
+            the supported website for which TapTap is designed.
         </p>
 
-        <h2>5. How We Use Information</h2>
-
-        <p>Information processed by TapTap may be used to:</p>
-
-        <ul>
-            <li>Authenticate and identify user accounts.</li>
-            <li>Validate licenses and account status.</li>
-            <li>Synchronize token balances.</li>
-            <li>Authorize and record token consumption.</li>
-            <li>Confirm payments and update token balances.</li>
-            <li>Provide TapTap's monitoring and notification functionality.</li>
-            <li>Maintain extension and backend functionality.</li>
-            <li>Prevent unauthorized use, abuse, or duplicate transactions.</li>
-            <li>Maintain service security and reliability.</li>
-            <li>Respond to customer support requests.</li>
-        </ul>
-
         <p>
-            We do not use collected information for unrelated advertising or user
-            profiling.
-        </p>
-
-        <h2>6. Server Communication</h2>
-
-        <p>
-            TapTap communicates with Batman Tech's backend services over HTTPS.
-            Server communication may be used to:
+            TapTap may inspect relevant webpage elements necessary to identify
+            supported transaction information, including information such as:
         </p>
 
         <ul>
-            <li>Authenticate accounts.</li>
-            <li>Validate licenses and activation status.</li>
-            <li>Synchronize token balances.</li>
-            <li>Authorize token consumption.</li>
-            <li>Record token usage.</li>
-            <li>Confirm payment transactions.</li>
-            <li>Maintain account and service records.</li>
-            <li>Provide support and service functionality.</li>
+            <li>Transaction or order identifier.</li>
+            <li>Transaction time.</li>
+            <li>Other webpage information required by TapTap's monitoring rules.</li>
         </ul>
 
         <p>
-            The extension does not download or execute remote JavaScript or other
-            executable code as part of its normal operation.
-        </p>
-
-        <h2>7. Payment Processing</h2>
-
-        <p>
-            TapTap may use third-party payment or payment-confirmation services,
-            including M-Pesa-related services, to process or confirm purchases.
+            TapTap uses this information to determine whether a supported
+            transaction has occurred and to request authorization from the
+            TapTap backend.
         </p>
 
         <p>
-            When a user makes a payment, TapTap may receive transaction information
-            necessary to confirm the payment and associate it with the appropriate
-            TapTap account or license.
+            TapTap does not intentionally collect general browsing history or
+            monitor unrelated websites.
         </p>
 
         <p>
-            TapTap does not request or store a user's M-Pesa PIN.
+            TapTap does not intentionally collect unrelated webpage content.
         </p>
 
         <p>
-            Third-party payment providers process payment information according to
-            their own terms and privacy policies.
+            The transaction identifier generated by the Extension is used for
+            token authorization and duplicate-transaction prevention.
         </p>
 
-        <h2>8. Data Sharing</h2>
+
+        <h2>5. Information Stored Locally by the Extension</h2>
 
         <p>
-            Batman Tech does not sell, rent, or trade users' personal information.
+            TapTap uses Chrome's extension storage facilities to store
+            information necessary for the Extension to operate.
+        </p>
+
+        <p>This may include:</p>
+
+        <ul>
+            <li>Account/email identifier.</li>
+            <li>Installation identifier.</li>
+            <li>Activation or service status.</li>
+            <li>Last-used payment phone number.</li>
+            <li>Auto-refresh settings.</li>
+            <li>Monitoring settings.</li>
+            <li>Extension preferences.</li>
+            <li>
+                Previously processed transaction identifiers used to prevent
+                duplicate processing.
+            </li>
+        </ul>
+
+        <p>
+            Local information is stored using Chrome's extension storage
+            environment on the user's device.
         </p>
 
         <p>
-            Information may be shared with service providers when reasonably necessary
-            to operate TapTap. These providers may include:
+            Local storage allows TapTap to maintain user preferences and
+            prevent the same transaction from being processed repeatedly.
+        </p>
+
+        <p>
+            Users can remove locally stored TapTap information by uninstalling
+            the Extension or clearing the Extension's stored data through
+            Chrome.
+        </p>
+
+
+        <h2>6. Payment Information</h2>
+
+        <p>
+            TapTap provides token purchases through
+            <strong>Safaricom M-Pesa</strong> payment functionality.
+        </p>
+
+        <p>When a user initiates a token purchase, TapTap may process:</p>
+
+        <ul>
+            <li>Mobile phone number provided for the M-Pesa payment.</li>
+            <li>Requested token quantity.</li>
+            <li>Payment amount.</li>
+            <li>Payment transaction reference.</li>
+            <li>M-Pesa checkout request identifier.</li>
+            <li>Payment status.</li>
+            <li>Payment timestamp or transaction information.</li>
+            <li>TapTap account/device identifier associated with the payment.</li>
+        </ul>
+
+        <p>
+            The mobile phone number is used to initiate the requested M-Pesa
+            payment.
+        </p>
+
+        <p>Payment information is used to:</p>
+
+        <ul>
+            <li>Initiate payment requests.</li>
+            <li>Confirm successful payments.</li>
+            <li>Associate successful payments with the correct TapTap account.</li>
+            <li>Credit the appropriate token balance.</li>
+            <li>Maintain transaction records.</li>
+            <li>Detect failed or cancelled payments.</li>
+            <li>Resolve payment-related problems.</li>
+        </ul>
+
+        <h3>M-Pesa PIN</h3>
+
+        <p>
+            TapTap does <strong>not</strong> collect, receive, or store the
+            user's M-Pesa PIN.
+        </p>
+
+        <p>
+            The M-Pesa PIN is entered directly by the user through Safaricom's
+            payment interface and is not provided to TapTap.
+        </p>
+
+        <p>
+            TapTap also does not intentionally collect bank passwords, card
+            PINs, or other banking authentication credentials.
+        </p>
+
+
+        <h2>7. Server Communication</h2>
+
+        <p>
+            TapTap communicates with Batman Tech's backend using HTTPS.
+        </p>
+
+        <p>The backend provides the central service for:</p>
+
+        <ul>
+            <li>Account/device registration.</li>
+            <li>Account identification.</li>
+            <li>Token balance management.</li>
+            <li>Token authorization.</li>
+            <li>Token consumption.</li>
+            <li>Transaction tracking.</li>
+            <li>Payment initiation.</li>
+            <li>Payment confirmation.</li>
+            <li>Monitoring-rule delivery.</li>
+            <li>Service status.</li>
+            <li>Security and abuse prevention.</li>
+        </ul>
+
+        <p>Information transmitted between the Extension and backend may include:</p>
+
+        <ul>
+            <li>Account/email identifier.</li>
+            <li>Device or installation identifier.</li>
+            <li>Transaction identifiers.</li>
+            <li>Token-related information.</li>
+            <li>Payment information required for payment processing.</li>
+            <li>Service and status information.</li>
+        </ul>
+
+        <p>
+            TapTap uses HTTPS to protect information while it is transmitted
+            between the Extension and the backend.
+        </p>
+
+        <p>
+            The Extension does not download or execute remote JavaScript or
+            other executable code as part of its normal operation.
+        </p>
+
+
+        <h2>8. How We Use Information</h2>
+
+        <p>Batman Tech uses information processed by TapTap for:</p>
+
+        <ol>
+            <li>Registering and identifying TapTap accounts.</li>
+            <li>Associating extension installations with accounts.</li>
+            <li>Maintaining token balances.</li>
+            <li>Authorizing token usage.</li>
+            <li>Recording token consumption.</li>
+            <li>Detecting supported transactions.</li>
+            <li>Providing monitoring and notification functionality.</li>
+            <li>Initiating and confirming M-Pesa payments.</li>
+            <li>Crediting successful token purchases.</li>
+            <li>Preventing duplicate transactions and token consumption.</li>
+            <li>Preventing unauthorized use and abuse.</li>
+            <li>Maintaining service security.</li>
+            <li>Monitoring service availability and reliability.</li>
+            <li>Troubleshooting technical problems.</li>
+            <li>Providing customer support.</li>
+            <li>Maintaining and improving the TapTap service.</li>
+        </ol>
+
+        <p>
+            Batman Tech does not use collected information for unrelated
+            advertising or behavioral advertising.
+        </p>
+
+
+        <h2>9. Third-Party Services and Data Sharing</h2>
+
+        <p>
+            Batman Tech does not sell, rent, or trade users' personal
+            information.
+        </p>
+
+        <p>
+            However, TapTap relies on specific third-party services to operate.
+            Information may therefore be processed by the following service
+            providers.
+        </p>
+
+        <h3>9.1 Render</h3>
+
+        <p>
+            TapTap's backend application is hosted using
+            <strong>Render</strong>.
+        </p>
+
+        <p>
+            Render provides cloud hosting and infrastructure for the TapTap
+            backend.
+        </p>
+
+        <p>
+            Information transmitted by the Extension to the TapTap backend is
+            processed by the hosted backend infrastructure in order to provide
+            TapTap's functionality.
+        </p>
+
+        <p>This may include:</p>
+
+        <ul>
+            <li>Account/device identifiers.</li>
+            <li>Token information.</li>
+            <li>Transaction information.</li>
+            <li>Payment-related information.</li>
+            <li>Technical request information necessary to operate the backend.</li>
+        </ul>
+
+        <p>
+            Render processes information as an infrastructure and hosting
+            provider for Batman Tech.
+        </p>
+
+
+        <h3>9.2 Supabase</h3>
+
+        <p>
+            TapTap uses <strong>Supabase</strong> as part of its backend
+            database infrastructure.
+        </p>
+
+        <p>
+            TapTap's backend uses a PostgreSQL database hosted through Supabase
+            to store service information.
+        </p>
+
+        <p>Information stored in the database may include:</p>
+
+        <ul>
+            <li>Account/device identifiers.</li>
+            <li>Token balances.</li>
+            <li>Token consumption records.</li>
+            <li>Payment transaction records.</li>
+            <li>Payment status.</li>
+            <li>Checkout request identifiers.</li>
+            <li>Service activity information.</li>
+            <li>Other records necessary to operate and secure TapTap.</li>
+        </ul>
+
+        <p>
+            Supabase processes and stores this information as a database and
+            infrastructure provider for Batman Tech.
+        </p>
+
+
+        <h3>9.3 Safaricom / M-Pesa</h3>
+
+        <p>
+            TapTap uses Safaricom's M-Pesa payment services, including the
+            M-Pesa Daraja API, to initiate and confirm token purchases.
+        </p>
+
+        <p>
+            When a user initiates an M-Pesa purchase, relevant payment
+            information may be transmitted to Safaricom as necessary to process
+            the transaction.
+        </p>
+
+        <p>This may include:</p>
+
+        <ul>
+            <li>Mobile phone number.</li>
+            <li>Payment amount.</li>
+            <li>Payment request information.</li>
+            <li>Transaction or checkout identifiers.</li>
+        </ul>
+
+        <p>
+            Safaricom processes payment information under its own terms and
+            privacy practices.
+        </p>
+
+        <p>
+            TapTap does not receive or store the user's M-Pesa PIN.
+        </p>
+
+
+        <h3>9.4 WhatsApp Support</h3>
+
+        <p>
+            TapTap provides a customer-support option that can open WhatsApp to
+            contact Batman Tech.
+        </p>
+
+        <p>
+            When the user chooses this option, TapTap may prepare a support
+            message containing the user's TapTap account/device identifier.
+        </p>
+
+        <p>
+            The user controls whether the WhatsApp message is sent.
+        </p>
+
+        <p>
+            If the user sends the message, the information is transmitted
+            through WhatsApp/Meta's services and is subject to their applicable
+            privacy policies and terms.
+        </p>
+
+        <p>
+            TapTap does not automatically send a WhatsApp message without the
+            user's action.
+        </p>
+
+
+        <h3>9.5 Legal and Security Disclosures</h3>
+
+        <p>
+            Batman Tech may disclose information when reasonably necessary to:
         </p>
 
         <ul>
-            <li>Cloud and secure hosting providers.</li>
-            <li>Database and infrastructure providers.</li>
-            <li>Payment-processing or payment-confirmation services.</li>
-            <li>Technical service providers used to maintain TapTap's backend.</li>
+            <li>Comply with applicable law.</li>
+            <li>Respond to valid legal requests.</li>
+            <li>Protect the security of TapTap.</li>
+            <li>Investigate fraud or abuse.</li>
+            <li>Prevent unauthorized access.</li>
+            <li>
+                Protect the rights, property, or safety of Batman Tech, users,
+                or others.
+            </li>
         </ul>
 
         <p>
-            Service providers receive only information reasonably necessary for the
-            services they provide.
+            Batman Tech does not share TapTap user information with advertisers
+            for targeted advertising.
+        </p>
+
+
+        <h2>10. Data Storage</h2>
+
+        <p>
+            TapTap uses both local browser storage and server-side storage.
+        </p>
+
+        <h3>Local Storage</h3>
+
+        <p>
+            Certain settings and identifiers are stored locally within Chrome's
+            extension storage on the user's device.
+        </p>
+
+        <h3>Server-Side Storage</h3>
+
+        <p>
+            Account, token, transaction, and service information required to
+            operate TapTap is processed by Batman Tech's backend and stored in
+            its database infrastructure.
         </p>
 
         <p>
-            We do not share personal information with advertisers for targeted
-            advertising.
+            The backend application is hosted on Render and the database
+            infrastructure is provided through Supabase.
+        </p>
+
+
+        <h2>11. Data Retention</h2>
+
+        <p>
+            Batman Tech retains information for only as long as reasonably
+            necessary for the purposes described in this Privacy Policy.
         </p>
 
         <p>
-            We may also disclose information when reasonably necessary to comply with
-            applicable law, respond to lawful requests, protect the security of the
-            service, or prevent fraud and abuse.
+            Account, device, token, and service records may be retained while
+            an account is active or while they are necessary to provide
+            TapTap.
         </p>
 
-        <h2>9. Data Storage and Retention</h2>
-
         <p>
-            Account and service information may be stored on Batman Tech's backend
-            infrastructure for as long as reasonably necessary to:
+            Payment and transaction records may be retained for as long as
+            reasonably necessary for:
         </p>
 
         <ul>
-            <li>Provide TapTap and maintain user accounts.</li>
-            <li>Maintain licensing and token records.</li>
-            <li>Maintain payment and transaction records.</li>
-            <li>Prevent fraud, abuse, or unauthorized use.</li>
-            <li>Resolve disputes and support requests.</li>
-            <li>Meet applicable legal or operational requirements.</li>
+            <li>Payment verification.</li>
+            <li>Accounting and transaction records.</li>
+            <li>Dispute resolution.</li>
+            <li>Fraud prevention.</li>
+            <li>Security.</li>
+            <li>Legal or operational requirements.</li>
         </ul>
 
         <p>
-            Local extension data remains on the user's device until it is removed by
-            the user, the extension is uninstalled, or the relevant Chrome storage is
-            cleared.
-        </p>
-
-        <h2>10. Data Security</h2>
-
-        <p>
-            Batman Tech uses reasonable technical and organizational measures to
-            protect information against unauthorized access, alteration, disclosure,
-            or destruction.
+            Technical and security information may be retained for as long as
+            reasonably necessary to maintain the security and reliability of
+            TapTap.
         </p>
 
         <p>
-            Communication between TapTap and its backend services is protected using
-            HTTPS encryption.
+            Local Extension information remains on the user's device until the
+            user removes it, uninstalls TapTap, or clears the Extension's
+            stored data.
+        </p>
+
+
+        <h2>12. Data Security</h2>
+
+        <p>
+            Batman Tech uses reasonable technical and organizational measures
+            designed to protect information against unauthorized access,
+            alteration, disclosure, or destruction.
         </p>
 
         <p>
-            No method of electronic transmission or storage can be guaranteed to be
-            completely secure. Users should also take reasonable steps to protect
-            their own devices, accounts, and authentication information.
+            TapTap uses HTTPS for communication between the Extension and its
+            backend.
         </p>
 
-        <h2>11. Your Choices and Data Requests</h2>
+        <p>
+            Backend access and administrative functions are protected using
+            authentication and access-control mechanisms.
+        </p>
+
+        <p>
+            However, no electronic transmission or storage system can be
+            guaranteed to be completely secure.
+        </p>
+
+        <p>
+            Users are responsible for maintaining the security of their own
+            devices, accounts, and authentication information.
+        </p>
+
+
+        <h2>13. Information We Do Not Intentionally Collect</h2>
+
+        <p>TapTap does not intentionally collect or store:</p>
+
+        <ul>
+            <li>M-Pesa PINs.</li>
+            <li>Bank passwords.</li>
+            <li>Banking authentication credentials.</li>
+            <li>Card PINs.</li>
+            <li>Personal files stored on the user's computer.</li>
+            <li>Precise physical location information.</li>
+            <li>General browsing history unrelated to TapTap.</li>
+            <li>Private messages unrelated to TapTap.</li>
+            <li>Unrelated website content.</li>
+            <li>Information from unrelated websites.</li>
+        </ul>
+
+        <p>
+            TapTap's website-monitoring functionality is limited to the
+            supported website for which the Extension is designed.
+        </p>
+
+
+        <h2>14. Your Choices and Data Requests</h2>
 
         <p>Users may:</p>
 
         <ul>
             <li>Stop using TapTap at any time.</li>
-            <li>Uninstall the TapTap extension.</li>
-            <li>Clear locally stored extension data.</li>
-            <li>Contact Batman Tech regarding their account or personal information.</li>
-            <li>Request information about personal data associated with their TapTap account.</li>
-            <li>Ask questions about how their information is processed.</li>
+            <li>Uninstall the TapTap Extension.</li>
+            <li>Clear locally stored Extension data.</li>
+            <li>Stop using TapTap payment functionality.</li>
+            <li>
+                Contact Batman Tech regarding their account or personal
+                information.
+            </li>
+            <li>
+                Request information about personal data associated with their
+                TapTap account.
+            </li>
+            <li>
+                Ask questions about how their information is collected, used,
+                stored, or shared.
+            </li>
+            <li>
+                Request deletion of personal information where applicable.
+            </li>
         </ul>
 
         <p>
-            Requests involving account or personal information may require reasonable
-            verification of the requester's identity or account ownership before
-            information is disclosed or an account action is performed.
-        </p>
-
-        <h2>12. Children's Privacy</h2>
-
-        <p>
-            TapTap is not specifically directed toward children. We do not knowingly
-            collect personal information from children for purposes unrelated to
-            providing the service.
+            Some information may need to be retained where reasonably necessary
+            for legitimate security, fraud-prevention, payment, accounting,
+            legal, dispute-resolution, or operational purposes.
         </p>
 
         <p>
-            If you believe that information belonging to a child has been provided to
-            Batman Tech improperly, please contact us so that we can review the matter.
+            Requests involving personal information may require reasonable
+            verification of account ownership or identity.
         </p>
 
-        <h2>13. Changes to This Privacy Policy</h2>
+
+        <h2>15. Children's Privacy</h2>
 
         <p>
-            We may update this Privacy Policy when TapTap's functionality, services,
-            or applicable requirements change.
+            TapTap is not specifically directed toward children.
+        </p>
+
+        <p>
+            Batman Tech does not knowingly collect personal information from
+            children for purposes unrelated to providing the service.
+        </p>
+
+        <p>
+            If you believe that information belonging to a child has been
+            improperly provided to Batman Tech, please contact us so that we
+            can review the matter.
+        </p>
+
+
+        <h2>16. Changes to This Privacy Policy</h2>
+
+        <p>
+            Batman Tech may update this Privacy Policy when TapTap's
+            functionality, data practices, services, or applicable requirements
+            change.
         </p>
 
         <p>
@@ -403,23 +898,40 @@
             effective date.
         </p>
 
-        <h2>14. Contact Us</h2>
+        <p>
+            Users are encouraged to review this Privacy Policy periodically.
+        </p>
+
+
+        <h2>17. Contact Us</h2>
 
         <div class="contact">
             <p><strong>Batman Tech</strong></p>
-            <p>WhatsApp: <strong>+254 725 766 022</strong></p>
+
             <p>
-                Privacy, account, or data-related questions may be submitted through
-                the contact information above.
+                <strong>WhatsApp:</strong>
+                +254 725 766 022
+            </p>
+
+            <p>
+                For privacy, account, personal-data, or data-processing
+                questions, contact Batman Tech using the contact information
+                above.
             </p>
         </div>
 
-        <a class="back" href="/">← Back to TapTap</a>
-    </div>
-
-    <footer>
-        © 2026 Batman Tech. All Rights Reserved.
-    </footer>
+    </article>
 </main>
+
+<footer class="footer">
+    <p>
+        &copy; 2026 Batman Tech. All rights reserved.
+    </p>
+
+    <p>
+        TapTap Privacy Policy
+    </p>
+</footer>
+
 </body>
 </html>
